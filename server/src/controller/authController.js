@@ -37,9 +37,9 @@ export const signup = async (req, res) => {
         const {fullName, username, password, confirmPassword, gender} = req.body;
 
         const validationError = validateSignUpRequest(
-            { fullName, username, password, confirmPassword});
+            {fullName, username, password, confirmPassword});
         if (validationError) {
-            return res.status(validationError.status).json({ error: validationError.error });
+            return res.status(validationError.status).json({error: validationError.error});
         }
 
         const user = await User.findOne({username});
@@ -51,15 +51,21 @@ export const signup = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const boyProfilePic = `https://avatar.iran.liara.run/public/boy?username=${username}`;
-        const girlProfilePic = `https://avatar.iran.liara.run/public/girl?username=${username}`;
+        const maleProfilePic = `https://avatar.iran.liara.run/public/boy?username=${username}`;
+        const femaleProfilePic = `https://avatar.iran.liara.run/public/girl?username=${username}`;
+        const randomProfilePic = `https://avatar.iran.liara.run/public/random?username=${username}`;
+
+        const userGender = gender?.trim() ? gender : undefined;
 
         const newUser = new User({
             fullName,
             username,
             password: hashedPassword,
-            gender,
-            profilePic: gender === "male" ? boyProfilePic : girlProfilePic,
+            gender: userGender,
+            profilePic: gender === "male" ? maleProfilePic :
+                gender === "female" ? femaleProfilePic
+                    : randomProfilePic,
+
         });
 
         if (newUser) {
@@ -76,7 +82,7 @@ export const signup = async (req, res) => {
             res.status(400).json({error: "Invalid user data"});
         }
     } catch (error) {
-        console.log("Error in signup controller", error.message);
+        console.log("Error while trying to signup", error.message);
         res.status(500).json({error: "Internal Server Error"});
     }
 };
