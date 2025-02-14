@@ -13,7 +13,7 @@ import {app, server} from "./socket/socket.js";
 dotenv.config();
 
 const __dirname = path.resolve();
-const PORT = process.env.PORT || 4000;
+const SERVER_PORT = process.env.SERVER_PORT || 8000;
 
 app.use(express.json());
 app.use(cookieParser());
@@ -28,9 +28,9 @@ app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
 });
 
-server.listen(PORT, () => {
+server.listen(SERVER_PORT, () => {
     connectToMongoDB().then(r => console.log(r));
-    console.log(`Server Running on port ${PORT}`);
+    console.log(`Server Running on port ${SERVER_PORT}`);
 });
 
 export default app;
