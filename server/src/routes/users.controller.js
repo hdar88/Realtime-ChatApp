@@ -1,6 +1,6 @@
 import express from "express";
-import protectRoute from "../middleware/authMiddleware.js";
-import {fetchUserList} from "../controller/userController.js";
+import protectedRoute from "../middleware/authMiddleware.js";
+import {fetchUserList} from "../services/user.service.js";
 
 /**
  * Router to handle user routes for sidebar users list.
@@ -8,6 +8,6 @@ import {fetchUserList} from "../controller/userController.js";
  */
 const router = express.Router();
 
-router.get("/", protectRoute, fetchUserList);
+router.get("/", protectedRoute, fetchUserList);
 
 export default router;

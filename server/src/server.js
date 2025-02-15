@@ -3,9 +3,9 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
-import authRoutes from "./routes/auth.js";
-import messageRoutes from "./routes/messages.js";
-import userRoutes from "./routes/users.js";
+import authRoutes from "./routes/auth.controller.js";
+import messageRoutes from "./routes/messages.controller.js";
+import userRoutes from "./routes/users.controller.js";
 
 import connectToMongoDB from "./db/mongoDbConnector.js";
 import {app, server} from "./socket/socket.js";
@@ -22,10 +22,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
-app.use(express.static(path.join(__dirname, "/frontend/dist")));
+app.use(express.static(path.join(__dirname, "/client")));
 
 app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
+    res.sendFile(path.join(__dirname, "client", "index.html"));
 });
 
 server.listen(SERVER_PORT, () => {

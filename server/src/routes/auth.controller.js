@@ -1,5 +1,5 @@
 import express from "express";
-import {login, logout, signup} from "../controller/authController.js";
+import {login, logout, signup} from "../services/auth.service.js";
 
 /**
  * Router to handle auth routes

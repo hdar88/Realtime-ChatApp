@@ -1,28 +1,6 @@
 import bcrypt from "bcryptjs";
 import User from "../models/userModel.js";
-import generateTokenAndSetCookie from "../utils/tokenGenerator.js";
-
-/**
- * Validates the data for signup users.
- */
-const validateSignUpRequest = ({fullName, username, password, confirmPassword}) => {
-    if (!fullName || fullName.trim() === "") {
-        return {status: 400, error: "Full name cannot be empty."};
-    }
-    if (!username || username.trim() === "") {
-        return {status: 400, error: "Username cannot be empty."};
-    }
-    if (!password || password.trim() === "") {
-        return {status: 400, error: "Password cannot be empty."};
-    }
-    if (password.length < 6) {
-        return {status: 400, error: "Password must be at least 6 characters long."};
-    }
-    if (password !== confirmPassword) {
-        return {status: 400, error: "Passwords don't match."};
-    }
-    return null;
-};
+import generateTokenAndSetAsCookie from "../utils/tokenGenerator.js";
 
 /**
  * @route POST /signup
@@ -69,7 +47,7 @@ export const signup = async (req, res) => {
         });
 
         if (newUser) {
-            generateTokenAndSetCookie(newUser._id, res);
+            generateTokenAndSetAsCookie(newUser._id, res);
             await newUser.save();
 
             res.status(201).json({
@@ -102,8 +80,7 @@ export const login = async (req, res) => {
         if (!user || !isPasswordCorrect) {
             return res.status(400).json({error: "Invalid username or password"});
         }
-
-        generateTokenAndSetCookie(user._id, res);
+        generateTokenAndSetAsCookie(user._id, res);
 
         res.status(200).json({
             _id: user._id,
@@ -131,4 +108,26 @@ export const logout = (req, res) => {
         console.log("Error while trying to logout:", error.message);
         res.status(500).json({error: "Internal Server Error"});
     }
+};
+
+/**
+ * Validates the data for signup users.
+ */
+const validateSignUpRequest = ({fullName, username, password, confirmPassword}) => {
+    if (!fullName || fullName.trim() === "") {
+        return {status: 400, error: "Full name cannot be empty."};
+    }
+    if (!username || username.trim() === "") {
+        return {status: 400, error: "Username cannot be empty."};
+    }
+    if (!password || password.trim() === "") {
+        return {status: 400, error: "Password cannot be empty."};
+    }
+    if (password.length < 6) {
+        return {status: 400, error: "Password must be at least 6 characters long."};
+    }
+    if (password !== confirmPassword) {
+        return {status: 400, error: "Passwords don't match."};
+    }
+    return null;
 };

@@ -1,5 +1,5 @@
 import express from "express";
-import {getMessages, sendMessage} from "../controller/messageController.js";
+import {getMessages, sendMessage} from "../services/message.service.js";
 import protectedRoute from "../middleware/authMiddleware.js";
 
 /**

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
 
 /**
- * Middleware to protect routes
+ * Middleware to protect routes. Checks if the user is authenticated.
  * @param req request
  * @param res response
  * @param next callback
@@ -16,7 +16,7 @@ const protectedRoute = async (req, res, next) => {
             return res.status(401).json({error: "Unauthorized - No Token Provided"});
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
         if (!decoded) {
             return res.status(401).json({error: "Unauthorized - Invalid Token"});
@@ -32,7 +32,7 @@ const protectedRoute = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.log("Error in protectRoute middleware: ", error.message);
+        console.log("Error while trying to verify token: ", error.message);
         res.status(500).json({error: "Internal server error"});
     }
 };

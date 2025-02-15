@@ -2,10 +2,10 @@ import jwt from "jsonwebtoken";
 
 /**
  * Generate a JWT token and set it as a cookie.
- * @param userId
- * @param res
+ * @param userId user id
+ * @param res response
  */
-const generateTokenAndSetCookie = (userId, res) => {
+const generateTokenAndSetAsCookie = (userId, res) => {
     try {
         const token = jwt.sign({userId}, process.env.ACCESS_TOKEN_SECRET, {
             expiresIn: "1d",
@@ -23,4 +23,4 @@ const generateTokenAndSetCookie = (userId, res) => {
     }
 };
 
-export default generateTokenAndSetCookie;
+export default generateTokenAndSetAsCookie;
