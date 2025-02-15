@@ -31,18 +31,14 @@ const userSchema = new mongoose.Schema(
         gender: {
             type: String,
             required: false,
-            enum: ["male", "female", "random"],
-            default: "random",
+            enum: ["male", "female", "divers"],
+            default: "divers",
         },
         profilePic: {
             type: String,
             default: "",
         },
         createdAt: {
-            type: Date,
-            default: new Date(),
-        },
-        updatedAt: {
             type: Date,
             default: new Date(),
         },

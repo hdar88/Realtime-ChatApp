@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
 
         const maleProfilePic = `https://avatar.iran.liara.run/public/boy?username=${username}`;
         const femaleProfilePic = `https://avatar.iran.liara.run/public/girl?username=${username}`;
-        const randomProfilePic = `https://avatar.iran.liara.run/public/random?username=${username}`;
+        const diversProfilePic = `https://avatar.iran.liara.run/public/random?username=${username}`;
 
         const userGender = gender?.trim() ? gender : undefined;
 
@@ -42,7 +42,7 @@ export const signup = async (req, res) => {
             gender: userGender,
             profilePic: gender === "male" ? maleProfilePic :
                 gender === "female" ? femaleProfilePic
-                    : randomProfilePic,
+                    : diversProfilePic,
 
         });
 
