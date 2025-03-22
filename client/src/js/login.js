@@ -15,15 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: {
                 "Content-Type": "application/json"
             },
+            credentials: 'include', // This is important for cookies
             body: JSON.stringify(loginData)
         })
             .then(response => response.json())
             .then(data => {
                 if (data._id) {
-                    // Store user data in localStorage
-                    localStorage.setItem('userId', data._id);
-                    localStorage.setItem('userFullName', data.fullName);
-                    localStorage.setItem('userProfilePic', data.profilePic);
+                    // No need to store in localStorage, the JWT cookie is automatically handled
                     window.location.href = "../pages/chat.html";
                 } else {
                     alert(data.error || "Login failed. Please check your credentials.");

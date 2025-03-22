@@ -19,8 +19,10 @@ const SERVER_PORT = process.env.SERVER_PORT || 8000;
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: "*",
-    credentials: true
+    origin: ['http://localhost:63342', 'http://127.0.0.1:63342'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use("/api/auth", authRoutes);
