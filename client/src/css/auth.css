@@ -1,0 +1,171 @@
+/* style sheet for login and signup form */
+
+/* Base Colors */
+:root {
+    --body-color: #f0f0f0;
+    --text-color: #190f05;
+    --background-color: #fdf8f3;
+    --primary-color: #d98a3e;
+    --secondary-color: #d1e98f;
+    --accent-color: #9ce063;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --body-color: #2c2c2c;
+        --text-color: #faf0e5;
+        --background-color: #0d0802;
+        --primary-color: #c07026;
+        --secondary-color: #576f16;
+        --accent-color: #589e1f;
+    }
+}
+
+/* Body and Background */
+body {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    font-family: 'Arial', sans-serif;
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    background-size: 400% 400%;
+    animation: gradientAnimation 15s ease infinite;
+}
+
+@keyframes gradientAnimation {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* The glass effect */
+.auth-container {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 380px;
+    backdrop-filter: blur(10px); /* Glassy effect */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    transition: transform 0.3s ease-in-out;
+}
+
+.auth-container:hover {
+    transform: scale(1.05); /* Slight zoom effect on hover */
+}
+
+.auth-container h1 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-size: 2em;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.auth-container input[type="text"],
+.auth-container input[type="password"] {
+    width: 100%;
+    padding: 15px;
+    margin: 15px 0;
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    font-size: 1em;
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+.auth-container input[type="text"]:focus,
+.auth-container input[type="password"]:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+/* Submit Button Styling */
+.auth-container button[type="submit"] {
+    width: 60%;
+    padding: 18px;
+    border: none;
+    background: linear-gradient(45deg, #ff9a8b, #ff6a00);
+    color: #fff;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-container button[type="submit"]:hover {
+    background: linear-gradient(45deg, #ff6a00, #ff9a8b);
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Link Styling */
+.auth-container a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 1em;
+}
+
+.auth-container a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .auth-container {
+        padding: 30px;
+        width: 90%;
+    }
+
+    .auth-container h1 {
+        font-size: 1.6em;
+    }
+}
+
+/* for gender dropdown */
+#signup-gender {
+    width: 100%;
+    padding: 15px;
+    margin: 15px 0;
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
+    font-size: 1em;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 40px;
+    background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"%3E%3Cpath fill="%23ffffff" d="M7 10l5 5 5-5z"%3E%3C/path%3E%3C/svg%3E');    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 40px;
+}
+
+#signup-gender:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+#signup-gender option {
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Signup - Realtime ChatApp</title>
+	<link rel="stylesheet" href="../css/auth.css">
+</head>
+<body>
+<div class="auth-container">
+	<h2>Signup</h2>
+	<form id="signup-form">
+		<label for="signup-fullname"></label><input type="text" id="signup-fullname" placeholder="Enter your full name"
+													required>
+		<label for="signup-username"></label><input type="text" id="signup-username" placeholder="Choose your username"
+													required>
+		<label for="signup-password"></label><input type="password" id="signup-password"
+													placeholder="Create your password" required>
+		<label for="signup-confirm-password"></label><input type="password" id="signup-confirm-password"
+															placeholder="Confirm your password" required>
+		<label for="signup-gender"></label><select id="signup-gender" required>
+		<option value="" disabled selected>Select your gender</option>
+		<option value="male">Male</option>
+		<option value="female">Female</option>
+		<option value="other">Other</option>
+	</select>
+		<button type="submit">Signup</button>
+	</form>
+	<p>Already have an account? <a href="login.html">Login</a></p>
+</div>
+</body>
+<script src="../js/signup.js"></script>
+</html>

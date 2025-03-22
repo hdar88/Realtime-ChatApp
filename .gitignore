@@ -130,7 +130,7 @@ dist
 .pnp.*
 
 # jetbrains
-.idea/
+/.idea/
 
 # mac
 .DS_Store
