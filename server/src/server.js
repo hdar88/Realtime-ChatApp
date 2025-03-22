@@ -27,7 +27,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
-app.use(express.static(path.join(__dirname, "")));
+app.use(express.static(path.join(__dirname, "../client")));
 
 server.listen(SERVER_PORT, () => {
     connectToMongoDB().then(r => console.log(r));

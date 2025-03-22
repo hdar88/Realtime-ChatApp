@@ -16,12 +16,10 @@ document.getElementById("login-form").addEventListener("submit", function (event
         },
         body: JSON.stringify(loginData)
     })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.href = "chat.html";
-            } else {
-                alert(data.message || "Login failed");
+        .then(response => {
+            if (response.status === 200) {
+                alert("Login successful.");
+                window.location.href = "../pages/chat.html";
             }
         })
         .catch(error => {

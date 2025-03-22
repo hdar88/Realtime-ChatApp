@@ -27,14 +27,10 @@ document.getElementById("signup-form").addEventListener("submit", function (even
         },
         body: JSON.stringify(signupData)
     })
-        .then(response => response.json())
-        .then(data => {
-            console.log("data:" + data);
-            if (data.success) {
-                alert("Signup successful!");
+        .then(response => {
+            if (response.status === 201) {
+                alert("Signup successful. Please login to continue.");
                 window.location.href = "../pages/login.html";
-            } else {
-                alert(data.message || "Signup failed");
             }
         })
         .catch(error => {
