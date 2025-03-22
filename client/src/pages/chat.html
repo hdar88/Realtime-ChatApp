@@ -10,22 +10,26 @@
 	<div class="chat-element" id="contacts-window">
 		<div class="user-elements">
 			<img src="../assets/user_profile_picture.webp" alt="User Image" class="user-image">
-			<h3 id="user-name">Max Mustermann</h3>
-			<img src="../assets/settings_icon_light.svg" alt="Settings Icon" class="settings-icon">
+			<h3 id="user-name">Loading...</h3>
+			<div class="settings-container">
+				<img src="../assets/settings_icon_light.svg" alt="Settings Icon" class="settings-icon">
+				<div class="settings-dropdown">
+					<button class="dropdown-item" id="sign-out-btn">Sign Out</button>
+					<button class="dropdown-item" id="settings-btn">Settings</button>
+				</div>
+			</div>
 		</div>
 		<div class="chat-rooms">
-
 			<input type="text" id="chat-room-input" placeholder="Searching...">
 		</div>
 	</div>
 
 	<div class="chat-element" id="messages-window">
-
 	</div>
 
 	<div class="chat-element" id="user-input-window">
-
 	</div>
 </div>
+<script src="../js/chat.js"></script>
 </body>
 </html>

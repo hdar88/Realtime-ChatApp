@@ -32,6 +32,5 @@ app.use(express.static(path.join(__dirname, "../client")));
 server.listen(SERVER_PORT, () => {
     connectToMongoDB().then(r => console.log(r));
     console.log(`Server Running on port ${SERVER_PORT}`);
-});
+});export default app;
 
-export default app;
