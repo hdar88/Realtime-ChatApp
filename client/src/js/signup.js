@@ -20,7 +20,7 @@ document.getElementById("signup-form").addEventListener("submit", function (even
         gender: gender
     };
 
-    fetch("http://localhost:8080/api/auth/signup", {
+    fetch("http://localhost:8000/api/auth/signup", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"

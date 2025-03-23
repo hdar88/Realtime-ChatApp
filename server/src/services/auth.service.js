@@ -29,9 +29,10 @@ export const signup = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const maleProfilePic = `https://avatar.iran.liara.run/public/boy?username=${username}`;
-        const femaleProfilePic = `https://avatar.iran.liara.run/public/girl?username=${username}`;
-        const diversProfilePic = `https://avatar.iran.liara.run/public/random?username=${username}`;
+        // Generate avatar using DiceBear
+        const avatarStyle = gender === "male" ? "adventurer" : 
+                          gender === "female" ? "adventurer-neutral" : "bottts";
+        const profilePic = `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${username}&backgroundColor=b6e3f4,c0aede,d1f4d9,ffd5dc,ffdfbf`;
 
         const userGender = gender?.trim() ? gender : undefined;
 
@@ -40,9 +41,7 @@ export const signup = async (req, res) => {
             username,
             password: hashedPassword,
             gender: userGender,
-            profilePic: gender === "male" ? maleProfilePic :
-                gender === "female" ? femaleProfilePic
-                    : diversProfilePic,
+            profilePic: profilePic,
         });
 
         if (newUser) {
