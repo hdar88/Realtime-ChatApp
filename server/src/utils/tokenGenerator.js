@@ -6,21 +6,16 @@ import jwt from "jsonwebtoken";
  * @param res response
  */
 const generateTokenAndSetAsCookie = (userId, res) => {
-    try {
-        const token = jwt.sign({userId}, process.env.ACCESS_TOKEN_SECRET, {
-            expiresIn: "1d",
-        });
+    const token = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '15d'
+    });
 
-        res.cookie("jwt", token, {
-            maxAge: 15 * 24 * 60 * 60 * 1000, // MS
-            httpOnly: true, // prevent XSS attacks cross-site scripting attacks
-            sameSite: "strict", // CSRF attacks cross-site request forgery attacks
-            secure: process.env.NODE_ENV !== "development",
-        });
-    } catch (error) {
-        console.log("Error generating token: ", error.message);
-        res.status(500).json({error: "Failed to generate token"});
-    }
+    res.cookie("jwt", token, {
+        maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days in milliseconds
+        httpOnly: true, // prevent XSS attacks
+        sameSite: "strict", // CSRF protection
+        secure: process.env.NODE_ENV === "production" // Only send cookie over HTTPS in production
+    });
 };
 
 export default generateTokenAndSetAsCookie;
