@@ -1,5 +1,3 @@
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:8080';
-
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById("login-form").addEventListener("submit", function(event) {
         event.preventDefault();
@@ -12,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
             password: password
         };
 
-        fetch(SERVER_URL + "/api/auth/login", {
+        fetch("http://localhost:8080/api/auth/login", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
