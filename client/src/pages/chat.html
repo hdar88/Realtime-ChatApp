@@ -6,9 +6,10 @@
 	<link rel="stylesheet" href="../css/chat.css">
 </head>
 <body>
-<div class="chat-window">
-	<div class="chat-element" id="contacts-window">
-		<div class="user-elements">
+<div class="chat-container">
+	<!-- Sidebar Section -->
+	<div class="sidebar">
+		<div class="user-profile">
 			<img src="../assets/user_profile_picture.webp" alt="User Image" class="user-image">
 			<h3 id="user-name">Loading...</h3>
 			<div class="settings-container">
@@ -19,17 +20,30 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Search bar and user list -->
+		<div class="search-container">
+			<input type="text" id="chat-room-input" placeholder="Search...">
+		</div>
 		<div class="chat-rooms">
-			<input type="text" id="chat-room-input" placeholder="Searching...">
+			<div class="chat-room" data-id="chat1">Chat with Alice</div>
+			<div class="chat-room" data-id="chat2">Chat with Bob</div>
 		</div>
 	</div>
 
-	<div class="chat-element" id="messages-window">
-	</div>
-
-	<div class="chat-element" id="user-input-window">
+	<!-- Chat Section -->
+	<div class="chat-section">
+		<div class="messages-container" id="messages-container">
+			<h2 id="chat-title">Select a chat</h2>
+			<div id="chat-content"></div>
+		</div>
+		<div class="user-input-container">
+			<input type="text" id="user-input" placeholder="Type a message...">
+			<button id="send-btn">Send</button>
+		</div>
 	</div>
 </div>
+
 <script src="../js/chat.js"></script>
 </body>
 </html>

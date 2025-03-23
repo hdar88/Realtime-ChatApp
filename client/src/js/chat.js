@@ -31,10 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const signOutBtn = document.getElementById('sign-out-btn');
         signOutBtn.addEventListener('click', () => {
             if (confirm('Are you sure you want to sign out?')) {
-                // Call the logout endpoint
                 fetch('http://localhost:8080/api/auth/logout', {
                     method: 'POST',
-                    credentials: 'include', // Important for sending cookies
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -80,10 +79,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const users = await response.json();
         const chatRoomsContainer = document.querySelector('.chat-rooms');
-
-        chatRoomsContainer.innerHTML = `
-            <input type="text" id="chat-room-input" placeholder="Searching...">
-        `;
 
         // Populate users in the sidebar
         users.forEach(user => {
