@@ -1,6 +1,11 @@
+// Set up socket for real-time communication
+const socket = io('http://localhost:8080');
+
 let currentChatUser = null;
 
-// Fetch user data from the server using JWT token
+/**
+ * Initialize the chat application
+ */
 document.addEventListener('DOMContentLoaded', () => {
     fetchUserData();
     fetchUsersList();
@@ -43,8 +48,6 @@ const fetchUserData = () => {
             if (userData.fullName) {
                 userNameElement.textContent = userData.fullName;
             }
-
-            // Add sign out functionality
             setupSignOutButton();
         })
         .catch(error => {
@@ -69,12 +72,10 @@ const setupSignOutButton = () => {
             })
                 .then(response => response.json())
                 .then(data => {
-                    // Redirect to login page
                     window.location.href = "../pages/login.html";
                 })
                 .catch(error => {
                     console.error('Error during logout:', error);
-                    // Even if the server call fails, we'll still redirect to login
                     window.location.href = "../pages/login.html";
                 });
         }
@@ -131,7 +132,6 @@ const populateUsersInSidebar = (users) => {
  * @param {Object} user User object
  */
 const openChatWithUser = async (user) => {
-
     // Check if the chat is already open
     if (currentChatUser && currentChatUser._id === user._id) {
         console.log('This chat is already open.');
@@ -139,7 +139,6 @@ const openChatWithUser = async (user) => {
     }
 
     currentChatUser = user;
-
     const chatTitle = document.getElementById('chat-title');
 
     if (chatTitle) {
@@ -163,7 +162,6 @@ const openChatWithUser = async (user) => {
         }
 
         const messages = await response.json();
-        const messagesContainer = document.querySelector('.messages-container');
         const messagesContainerContent = document.querySelector('#chat-content');
 
         if (messagesContainerContent) {
@@ -174,7 +172,6 @@ const openChatWithUser = async (user) => {
         messages.forEach(message => {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
-            console.log("Message: ", message);
 
             // Apply 'sent' class if the message is from the current user
             if (message.senderId === user._id) {
@@ -187,12 +184,39 @@ const openChatWithUser = async (user) => {
             messagesContainerContent.appendChild(messageElement);
             messagesContainerContent.prepend(messageElement);
         });
-        //messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
     } catch (error) {
         console.error('Error fetching messages:', error);
     }
 };
 
+/**
+ * Listen for new messages and update the chat window
+ *
+ * @param {Object} newMessage New message object
+ */
+socket.on('newMessage', (newMessage) => {
+    // Check if the current chat is with the sender of the new message
+    if (currentChatUser && currentChatUser._id === newMessage.senderId) {
+        const messagesContainerContent = document.querySelector('#chat-content');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+
+        if (newMessage.senderId === currentChatUser._id) {
+            messageElement.classList.add('sent');
+        } else {
+            messageElement.classList.add('received');
+        }
+
+        messageElement.textContent = `${newMessage.senderId}: ${newMessage.message}`;
+        messagesContainerContent.prepend(messageElement);
+        messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
+    }
+});
+
+/**
+ * Helper function to get the currently selected chat user (receiver)
+ * @returns {Object} User object
+ */
 const getCurrentChatUser = () => {
     return currentChatUser;
 }
@@ -220,6 +244,21 @@ const sendMessage = async (user) => {
         receiverId: user._id
     };
 
+    // Display the message immediately as sent
+    const messagesContainerContent = document.querySelector('#chat-content');
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message');
+    messageElement.classList.add('sent');
+    messageElement.textContent = `${user._id}: ${message}`;
+    messagesContainerContent.prepend(messageElement);
+
+    // Emit a new message event to the server
+    socket.emit('newMessage', {
+        senderId: user._id,
+        message,
+        receiverId: user._id
+    });
+
     try {
         const response = await fetch(`http://localhost:8080/api/messages/send/${user._id}`, {
             method: 'POST',
@@ -237,7 +276,6 @@ const sendMessage = async (user) => {
             console.log('Message sent successfully: ', response);
         }
 
-        // Clear the message input field
         messageInput.value = '';
     } catch (error) {
         console.error('Error sending message:', error);
@@ -265,9 +303,9 @@ const setupSettingsDropdown = () => {
     });
 };
 
-// Set up socket for real-time communication
-const socket = io('http://localhost:8080');
-
+/**
+ * Connect to the server socket and listen for events
+ */
 socket.on('connect', () => {
     console.log('Connected to server');
 
@@ -280,7 +318,6 @@ socket.on('connect', () => {
     // Listen for new users
     socket.on('user', (user) => {
         console.log('New user:', user);
-        // Optionally, update user list in the sidebar
     });
 
     // Listen for user typing
