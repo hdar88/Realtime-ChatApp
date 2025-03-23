@@ -104,3 +104,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 const openChatWithUser = (user) => {
     console.log('Opening chat with user:', user);
 }
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const settingsIcon = document.querySelector('.settings-icon');
+    const settingsDropdown = document.querySelector('.settings-dropdown');
+
+    // Toggle dropdown visibility on settings icon click
+    settingsIcon.addEventListener('click', (event) => {
+        // Prevent click event from propagating to avoid other interactions
+        event.stopPropagation();
+
+        // Toggle the visibility of the dropdown
+        if (settingsDropdown.style.display === 'flex') {
+            settingsDropdown.style.display = 'none';
+        } else {
+            settingsDropdown.style.display = 'flex';
+        }
+    });
+
+    // Close dropdown if clicked outside
+    document.addEventListener('click', (event) => {
+        if (!settingsIcon.contains(event.target) && !settingsDropdown.contains(event.target)) {
+            settingsDropdown.style.display = 'none';
+        }
+    });
+});
