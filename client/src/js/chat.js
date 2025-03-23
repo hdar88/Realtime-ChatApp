@@ -131,6 +131,13 @@ const populateUsersInSidebar = (users) => {
  * @param {Object} user User object
  */
 const openChatWithUser = async (user) => {
+
+    // Check if the chat is already open
+    if (currentChatUser && currentChatUser._id === user._id) {
+        console.log('This chat is already open.');
+        return;
+    }
+
     currentChatUser = user;
 
     const chatTitle = document.getElementById('chat-title');
@@ -157,15 +164,30 @@ const openChatWithUser = async (user) => {
 
         const messages = await response.json();
         const messagesContainer = document.querySelector('.messages-container');
+        const messagesContainerContent = document.querySelector('#chat-content');
+
+        if (messagesContainerContent) {
+            messagesContainerContent.innerHTML = '';
+        }
 
         // Display the fetched messages
         messages.forEach(message => {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
             console.log("Message: ", message);
+
+            // Apply 'sent' class if the message is from the current user
+            if (message.senderId === user._id) {
+                messageElement.classList.add('received');
+            } else {
+                messageElement.classList.add('sent');
+            }
+
             messageElement.textContent = `${message.senderId}: ${message.message}`;
-            messagesContainer.appendChild(messageElement);
+            messagesContainerContent.appendChild(messageElement);
+            messagesContainerContent.prepend(messageElement);
         });
+        //messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
     } catch (error) {
         console.error('Error fetching messages:', error);
     }

@@ -159,7 +159,10 @@ body {
     padding: 20px;
 }
 
+/* Chat Section Styling */
 .messages-container {
+    display: flex;
+    flex-direction: column-reverse;
     flex-grow: 1;
     background: rgba(20, 20, 20, 0.7);
     backdrop-filter: blur(12px);
@@ -167,6 +170,46 @@ body {
     border-radius: 15px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow-y: auto;
+}
+
+.chat-content {
+    display: flex;
+    flex-direction: column-reverse;
+    flex-grow: 1;
+    background: rgba(20, 20, 20, 0.7);
+    backdrop-filter: blur(12px);
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow-y: auto;
+}
+
+/* Styling for each individual message */
+.message {
+    background-color: black;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    word-wrap: break-word;
+    max-width: 80%;
+}
+
+/* Styling for messages sent by the user */
+.message.sent {
+    background-color: darkolivegreen;
+    color: white;
+    align-self: flex-end;
+    margin-bottom: 10px;
+}
+
+/* Styling for messages received from other users */
+.message.received {
+    background-color: darkorange;
+    color: black;
+    align-self: flex-start;
+    margin-bottom: 10px;
 }
 
 #chat-title {
