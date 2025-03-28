@@ -145,11 +145,58 @@ body {
     cursor: pointer;
     background: rgba(255, 255, 255, 0.08);
     transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    position: relative;
 }
 
 .chat-room:hover {
     background: var(--primary-color);
     color: white;
+}
+
+.chat-room.selected {
+    background: var(--primary-color);
+    color: white;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.status-indicator.online {
+    background-color: #2ecc71; /* Green */
+    box-shadow: 0 0 5px #2ecc71;
+}
+
+.status-indicator.offline {
+    background-color: #95a5a6; /* Gray */
+}
+
+.unread-badge {
+    background-color: #e74c3c; /* Red */
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: auto;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.chat-room .user-name {
+    flex-grow: 1;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .chat-section {
@@ -175,7 +222,7 @@ body {
 
 .chat-content {
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: column;
     flex-grow: 1;
     background: rgba(20, 20, 20, 0.7);
     backdrop-filter: blur(12px);

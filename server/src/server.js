@@ -7,6 +7,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.controller.js";
 import messageRoutes from "./routes/messages.controller.js";
 import userRoutes from "./routes/users.controller.js";
+import unreadRoutes from "./routes/unread.controller.js";
 
 import connectToMongoDB from "./db/mongoDbConnector.js";
 import {app, server} from "./socket/socket.js";
@@ -38,11 +39,14 @@ app.use(cors({
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/unread", unreadRoutes);
 
 app.use(express.static(path.join(__dirname, "../client")));
 
 server.listen(SERVER_PORT, () => {
     connectToMongoDB().then(r => console.log(r));
     console.log(`Server Running on port ${SERVER_PORT}`);
-});export default app;
+});
+
+export default app;
 
