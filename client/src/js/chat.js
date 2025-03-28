@@ -199,6 +199,61 @@ const populateUsersInSidebar = (users) => {
 };
 
 /**
+ * Format a date object to display time
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted time string
+ */
+const formatMessageTime = (date) => {
+    const now = new Date();
+    const messageDate = new Date(date);
+    
+    // Format time as HH:MM
+    const hours = messageDate.getHours().toString().padStart(2, '0');
+    const minutes = messageDate.getMinutes().toString().padStart(2, '0');
+    const timeString = `${hours}:${minutes}`;
+    
+    // If not today, add date
+    if (now.toDateString() !== messageDate.toDateString()) {
+        const month = messageDate.toLocaleDateString('en-US', { month: 'short' });
+        const day = messageDate.getDate();
+        return `${month} ${day}, ${timeString}`;
+    }
+    
+    return timeString;
+};
+
+/**
+ * Create a message element
+ * @param {Object} message - Message object
+ * @param {boolean} isSent - Whether message was sent by current user
+ * @param {string} username - Username to display for received messages
+ * @returns {HTMLElement} The message element
+ */
+const createMessageElement = (message, isSent, username) => {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message');
+    messageElement.classList.add(isSent ? 'sent' : 'received');
+    
+    // Add content wrapper div
+    const contentWrapper = document.createElement('div');
+    contentWrapper.classList.add('message-content');
+    
+    // Add message text
+    const contentText = isSent ? `You: ${message.message}` : `${username || 'User'}: ${message.message}`;
+    contentWrapper.textContent = contentText;
+    
+    messageElement.appendChild(contentWrapper);
+    
+    // Add timestamp
+    const timestamp = document.createElement('span');
+    timestamp.classList.add('message-time');
+    timestamp.textContent = formatMessageTime(message.createdAt || new Date());
+    messageElement.appendChild(timestamp);
+    
+    return messageElement;
+};
+
+/**
  * Open a chat with the selected user and load the chat history.
  * @param {Object} user User object
  */
@@ -254,18 +309,8 @@ const openChatWithUser = async (user) => {
             messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
             
             messages.forEach(message => {
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('message');
-
-                // Check if I'm the sender of this message
-                if (message.senderId === myUserId) {
-                    messageElement.classList.add('sent');
-                    messageElement.textContent = `You: ${message.message}`;
-                } else {
-                    messageElement.classList.add('received');
-                    messageElement.textContent = `${user.username || 'User'}: ${message.message}`;
-                }
-
+                const isSent = message.senderId === myUserId;
+                const messageElement = createMessageElement(message, isSent, user.username);
                 messagesContainerContent.appendChild(messageElement);
             });
             
@@ -334,24 +379,51 @@ socket.on('newMessage', (newMessage) => {
     // Check if the current chat is with the sender of the new message
     if (currentChatUser && 
         (currentChatUser._id === newMessage.senderId || currentChatUser._id === newMessage.receiverId)) {
+        
+        // If this message has a tempId, it might be a confirmation of our own message
+        if (newMessage.tempId) {
+            // Check if we already have this message displayed with the temp ID
+            const existingMsg = document.querySelector(`[data-message-id="${newMessage.tempId}"]`);
+            if (existingMsg) {
+                // This is a confirmation of our pending message, update it
+                existingMsg.setAttribute('data-message-id', newMessage._id || newMessage.tempId);
+                existingMsg.classList.remove('pending');
+                
+                // Remove the pending indicator if it exists
+                const indicator = existingMsg.querySelector('.pending-indicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+                
+                // Update timestamp with the server timestamp
+                const timestamp = existingMsg.querySelector('.message-time');
+                if (timestamp && newMessage.createdAt) {
+                    timestamp.textContent = formatMessageTime(newMessage.createdAt);
+                }
+                
+                return; // Don't add a duplicate message
+            }
+        }
+        
         const messagesContainerContent = document.querySelector('#chat-content');
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('message');
-
-        // If I am the sender (my ID matches the senderId)
-        if (newMessage.senderId === currentUserId) {
-            messageElement.classList.add('sent');
-            messageElement.textContent = `You: ${newMessage.message}`;
-        } else {
-            messageElement.classList.add('received');
-            messageElement.textContent = `${currentChatUser.username || 'User'}: ${newMessage.message}`;
-            
-            // Reset unread messages since we're viewing them
+        
+        // Create message element - determine if sent by current user
+        const isSent = newMessage.senderId === currentUserId;
+        const messageElement = createMessageElement(newMessage, isSent, currentChatUser.username);
+        
+        // Set message ID for reference
+        if (newMessage._id) {
+            messageElement.setAttribute('data-message-id', newMessage._id);
+        }
+        
+        // Add to chat and scroll
+        messagesContainerContent.appendChild(messageElement);
+        messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
+        
+        // If this is a received message in the current chat, reset unread count
+        if (!isSent) {
             resetUnreadMessages(newMessage.senderId);
         }
-
-        messagesContainerContent.appendChild(messageElement); // Append to show newest at bottom
-        messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
     }
 });
 
@@ -411,28 +483,46 @@ const sendMessage = async (user) => {
         return;
     }
 
-    const messageData = {
-        message,
-        receiverId: user._id
+    // Create a temporary message object for immediate display
+    const tempMessageObj = {
+        _id: 'temp-' + Date.now(), // Temporary ID
+        senderId: currentUserId,
+        receiverId: user._id,
+        message: message,
+        createdAt: new Date()
     };
 
     // Display the message immediately as sent
     const messagesContainerContent = document.querySelector('#chat-content');
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message');
-    messageElement.classList.add('sent');
-    messageElement.textContent = `You: ${message}`;
+    const messageElement = createMessageElement(tempMessageObj, true, null);
+    messageElement.setAttribute('data-message-id', tempMessageObj._id);
+    messageElement.classList.add('pending');
+    
+    // Add a subtle indicator that the message is pending
+    const pendingIndicator = document.createElement('span');
+    pendingIndicator.classList.add('pending-indicator');
+    pendingIndicator.innerHTML = '⌛'; // Hourglass emoji
+    pendingIndicator.title = 'Sending...';
+    messageElement.appendChild(pendingIndicator);
+    
     messagesContainerContent.appendChild(messageElement);
     messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
 
     // Clear input field right away for better UX
     messageInput.value = '';
 
-    // Create message object with all required data
+    // Prepare data for API call
+    const messageData = {
+        message,
+        receiverId: user._id
+    };
+
+    // Create message object for socket
     const messageObject = {
         senderId: currentUserId,
         message: message,
-        receiverId: user._id
+        receiverId: user._id,
+        tempId: tempMessageObj._id // Include temp ID for tracking
     };
 
     // First emit the message via socket for real-time delivery
@@ -452,12 +542,53 @@ const sendMessage = async (user) => {
 
         if (!response.ok) {
             console.error('Failed to send message: ' + response.status);
+            // Mark message as failed
+            const pendingMsg = document.querySelector(`[data-message-id="${tempMessageObj._id}"]`);
+            if (pendingMsg) {
+                const indicator = pendingMsg.querySelector('.pending-indicator');
+                if (indicator) {
+                    indicator.innerHTML = '❌'; // X emoji
+                    indicator.title = 'Failed to send';
+                }
+                pendingMsg.classList.add('failed');
+            }
             return;
-        } else {
-            console.log('Message saved to database successfully');
+        } 
+        
+        const savedMessage = await response.json();
+        console.log('Message saved to database successfully:', savedMessage);
+        
+        // Update the temporary message with the confirmed one
+        const pendingMsg = document.querySelector(`[data-message-id="${tempMessageObj._id}"]`);
+        if (pendingMsg) {
+            pendingMsg.setAttribute('data-message-id', savedMessage._id);
+            pendingMsg.classList.remove('pending');
+            
+            // Remove the pending indicator
+            const indicator = pendingMsg.querySelector('.pending-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+            
+            // Update timestamp with the server timestamp
+            const timestamp = pendingMsg.querySelector('.message-time');
+            if (timestamp && savedMessage.createdAt) {
+                timestamp.textContent = formatMessageTime(savedMessage.createdAt);
+            }
         }
+        
     } catch (error) {
         console.error('Error sending message:', error);
+        // Mark message as failed
+        const pendingMsg = document.querySelector(`[data-message-id="${tempMessageObj._id}"]`);
+        if (pendingMsg) {
+            const indicator = pendingMsg.querySelector('.pending-indicator');
+            if (indicator) {
+                indicator.innerHTML = '❌'; // X emoji
+                indicator.title = 'Failed to send';
+            }
+            pendingMsg.classList.add('failed');
+        }
     }
 };
 

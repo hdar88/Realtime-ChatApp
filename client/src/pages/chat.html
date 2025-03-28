@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Realtime-ChatApp</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Realtime Chat App</title>
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
 	<link rel="stylesheet" href="../css/chat.css">
 	<script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 </head>
@@ -11,10 +13,10 @@
 	<!-- Sidebar Section -->
 	<div class="sidebar">
 		<div class="user-profile">
-			<img src="../assets/user_profile_picture.webp" alt="User Image" class="user-image">
+			<img src="../assets/user_profile_picture.webp" alt="User" class="user-image">
 			<h3 id="user-name">Loading...</h3>
 			<div class="settings-container">
-				<img src="../assets/settings_icon_light.svg" alt="Settings Icon" class="settings-icon">
+				<img src="../assets/settings_icon_light.svg" alt="Settings" class="settings-icon">
 				<div class="settings-dropdown">
 					<button class="dropdown-item" id="sign-out-btn">Sign Out</button>
 					<button class="dropdown-item" id="settings-btn">Settings</button>
@@ -24,17 +26,17 @@
 
 		<!-- Search bar and user list -->
 		<div class="search-container">
-			<input type="text" id="chat-room-input" placeholder="Search...">
+			<input type="text" id="chat-room-input" placeholder="Search users...">
 		</div>
 		<div class="chat-rooms"></div>
 	</div>
 
 	<!-- Chat Section -->
 	<div class="chat-section">
-		<div class="messages-container" id="messages-container">
+		<div class="chat-header">
 			<h2 id="chat-title">Select a chat</h2>
-			<div class="chat-content" id="chat-content"></div>
 		</div>
+		<div class="chat-content" id="chat-content"></div>
 		<div class="user-input-container">
 			<input type="text" id="user-input" placeholder="Type a message...">
 			<button id="send-btn">Send</button>
