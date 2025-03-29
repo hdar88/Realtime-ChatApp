@@ -52,6 +52,14 @@ body {
     height: 100vh;
     margin: 0;
     padding: 0;
+    background-size: 400% 400%;
+    animation: gradientAnimation 15s ease infinite;
+}
+
+@keyframes gradientAnimation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .chat-container {
@@ -208,7 +216,7 @@ body {
     font-size: 0.7rem;
     font-weight: 600;
     height: 20px;
-    min-width: 20px;
+    min-width: 10px;
     padding: 0 6px;
     border-radius: var(--radius-circle);
     display: flex;
@@ -234,7 +242,8 @@ body {
 }
 
 .chat-header {
-    padding: 20px;
+    padding: 18px;
+    min-height: 60px;
     border-bottom: 1px solid var(--light-gray);
     display: flex;
     align-items: center;
@@ -395,15 +404,15 @@ body {
         height: 100vh;
         border-radius: 0;
     }
-    
+
     .sidebar {
         width: 40%;
     }
-    
+
     .chat-section {
         width: 60%;
     }
-    
+
     .message {
         max-width: 80%;
     }
@@ -413,17 +422,35 @@ body {
     .sidebar {
         display: none;
     }
-    
+
     .chat-section {
         width: 100%;
     }
-    
+
     .user-profile {
         padding: 15px;
     }
-    
+
     .user-image {
         width: 40px;
         height: 40px;
     }
+}
+
+/* for typing indicator */
+#typing-indicator {
+    display: none;
+    position: fixed;
+    font-size: 18px;
+    color: gray;
+    font-style: italic;
+    margin-top: 35px;
+    padding-left: 10px;
+    animation: fadeInOut 1.65s infinite alternate;
+    z-index: auto;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
 }
