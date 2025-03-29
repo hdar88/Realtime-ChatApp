@@ -279,12 +279,12 @@ const createMessageElement = (message, isSent, username) => {
     timestamp.textContent = formatMessageTime(message.createdAt || new Date());
     messageElement.appendChild(timestamp);
 
-    // Add read status indicator for sent messages only
-    if (isSent) {
+    // Add read status indicator for sent direct messages only
+    // Group chat read status will be handled separately
+    if (isSent && !isGroupChat) {
         const readStatus = document.createElement('span');
         readStatus.classList.add('read-status');
 
-        // Check if the message has been read
         if (message.isRead) {
             readStatus.innerHTML = '✓✓'; // Double check mark for read
             readStatus.classList.add('read');
@@ -1567,22 +1567,13 @@ const sendGroupMessage = async () => {
         messageElement.removeChild(pendingIndicator);
         messageElement.setAttribute('data-message-id', sentMessage._id);
         
-        // Add read status
-        const readStatus = document.createElement('span');
-        readStatus.classList.add('read-status', 'delivered');
-        readStatus.textContent = `Read by 1/${currentGroupChat.members.length - 1}`;
-        messageElement.appendChild(readStatus);
-        
-        // DO NOT emit an additional socket event - the server already does this when saving the message
-        // socket.emit('newGroupMessage', {
-        //     groupId: currentGroupChat._id,
-        //     senderId: currentUserId,
-        //     message: message,
-        //     _id: sentMessage._id,
-        //     tempId: tempMessageId,
-        //     createdAt: sentMessage.createdAt || new Date(),
-        //     readBy: sentMessage.readBy || [currentUserId]
-        // });
+        // Find the existing read status and make sure it's showing delivered
+        let readStatus = messageElement.querySelector('.read-status');
+        if (readStatus) {
+            readStatus.textContent = 'Delivered';
+            readStatus.classList.remove('read');
+            readStatus.classList.add('delivered');
+        }
         
     } catch (error) {
         console.error('Error sending group message:', error);
@@ -2243,17 +2234,41 @@ const updateGroupMessageReadStatus = (messageId) => {
     
     // Fetch the latest message data to get accurate read count
     fetchGroupMessageDetails(messageId).then(message => {
-        if (!message) return;
+        if (!message || !message.readBy) return;
         
-        const readCount = message.readBy.length - 1; // Subtract one for sender (self)
-        const totalMembers = currentGroupChat.members.length - 1; // Exclude self
+        // Get a list of active member IDs from the current group chat
+        const memberIds = currentGroupChat.members.map(member => 
+            typeof member === 'object' ? member._id : member
+        );
         
-        if (readCount === totalMembers) {
+        // Filter out the sender (current user) from the count
+        const otherMemberIds = memberIds.filter(id => id !== currentUserId);
+        
+        // Check which members have read the message
+        let allMembersRead = true;
+        
+        // Convert readBy to string IDs if they're objects
+        const readByIds = message.readBy.map(reader => 
+            typeof reader === 'object' ? reader._id : reader
+        );
+        
+        // Check if all other members have read the message
+        for (const memberId of otherMemberIds) {
+            if (!readByIds.includes(memberId)) {
+                allMembersRead = false;
+                break;
+            }
+        }
+        
+        if (allMembersRead && otherMemberIds.length > 0) {
             readStatus.classList.remove('delivered');
             readStatus.classList.add('read');
             readStatus.textContent = 'Read by all';
         } else {
-            readStatus.textContent = `Read by ${readCount}/${totalMembers}`;
+            // Don't show the count, just indicate it's delivered
+            readStatus.classList.remove('read');
+            readStatus.classList.add('delivered');
+            readStatus.textContent = 'Delivered';
         }
     });
 };
@@ -2343,6 +2358,20 @@ const processGroupMessage = (message, isFromCurrentUser = false) => {
     // Display the message
     const chatContent = document.getElementById('chat-content');
     const messageElement = createMessageElement(message, isFromCurrentUser, senderName);
+    
+    // Add read status for sent messages
+    if (isFromCurrentUser) {
+        const readStatus = document.createElement('span');
+        readStatus.classList.add('read-status', 'delivered');
+        readStatus.textContent = 'Delivered';
+        messageElement.appendChild(readStatus);
+        
+        // If this is an existing message with read status info, update the status
+        if (message.readBy && message.readBy.length > 0) {
+            updateGroupMessageReadStatus(message._id);
+        }
+    }
+    
     chatContent.appendChild(messageElement);
     chatContent.scrollTop = chatContent.scrollHeight;
     
