@@ -193,6 +193,15 @@ body {
     background: rgba(92, 107, 192, 0.2);
 }
 
+.user-sidebar-pic {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-circle);
+    object-fit: cover;
+    margin-right: 8px;
+    box-shadow: var(--shadow-light);
+}
+
 .status-indicator {
     display: inline-block;
     width: 10px;
@@ -247,12 +256,46 @@ body {
     border-bottom: 1px solid var(--light-gray);
     display: flex;
     align-items: center;
+    justify-content: space-between;
+}
+
+.chat-header-info {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    justify-content: center;
+    text-align: center;
+}
+
+.chat-user-image {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-circle);
+    object-fit: cover;
+    margin-right: 15px;
+    box-shadow: var(--shadow-light);
+}
+
+.chat-user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 #chat-title {
     font-size: 1.1rem;
     font-weight: 500;
     margin: 0;
+}
+
+.left-actions {
+    min-width: 40px; /* To balance the header */
+}
+
+.chat-header-actions {
+    min-width: 40px;
+    display: flex;
+    gap: 10px;
 }
 
 .chat-content {
@@ -440,14 +483,11 @@ body {
 /* for typing indicator */
 #typing-indicator {
     display: none;
-    position: fixed;
-    font-size: 18px;
-    color: gray;
+    font-size: 0.8rem;
+    color: var(--medium-gray);
     font-style: italic;
-    margin-top: 35px;
-    padding-left: 10px;
+    margin-top: 2px;
     animation: fadeInOut 1.65s infinite alternate;
-    z-index: auto;
 }
 
 @keyframes fadeInOut {
@@ -723,19 +763,4 @@ body {
 .icon-btn:hover {
     background-color: #333;
     color: #fff;
-}
-
-.chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.chat-header-info {
-    flex-grow: 1;
-}
-
-.chat-header-actions {
-    display: flex;
-    gap: 10px;
 }

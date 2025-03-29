@@ -189,6 +189,12 @@ const populateUsersInSidebar = (users) => {
         userElement.classList.add('chat-room', 'user-item');
         userElement.setAttribute('data-user-id', user._id);
 
+        // Create user profile picture
+        const userPic = document.createElement('img');
+        userPic.classList.add('user-sidebar-pic');
+        userPic.src = user.profilePic || '../assets/user_profile_picture.webp';
+        userPic.alt = user.username || 'User';
+
         // Create status indicator
         const statusIndicator = document.createElement('span');
         statusIndicator.classList.add('status-indicator', 'offline');
@@ -199,6 +205,7 @@ const populateUsersInSidebar = (users) => {
         userName.textContent = user.fullName || user.username || 'Anonymous User';
 
         // Append elements to user container
+        userElement.appendChild(userPic);
         userElement.appendChild(statusIndicator);
         userElement.appendChild(userName);
 
@@ -320,9 +327,16 @@ const openChatWithUser = async (user) => {
     }
 
     const chatTitle = document.getElementById('chat-title');
+    const chatUserImage = document.getElementById('chat-user-image');
 
     if (chatTitle) {
         chatTitle.textContent = user.username || 'Unknown User';
+    }
+    
+    if (chatUserImage) {
+        // Set the user's profile picture or a default if not available
+        chatUserImage.src = user.profilePic || '../assets/user_profile_picture.webp';
+        chatUserImage.alt = user.username || 'User';
     }
 
     try {
@@ -1311,7 +1325,20 @@ const openGroupChat = async (group) => {
 
     // Update UI
     const chatTitle = document.getElementById('chat-title');
+    const chatUserImage = document.getElementById('chat-user-image');
+    
     chatTitle.textContent = group.name;
+    
+    // Set group icon or default group image
+    if (chatUserImage) {
+        if (group.groupPic) {
+            chatUserImage.src = group.groupPic;
+        } else {
+            // Default group icon
+            chatUserImage.src = '../assets/group_icon.webp';
+        }
+        chatUserImage.alt = group.name || 'Group';
+    }
 
     // Show group info button 
     document.getElementById('chat-header-actions').style.display = 'flex';
