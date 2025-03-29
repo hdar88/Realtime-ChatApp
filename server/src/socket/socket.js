@@ -2,6 +2,7 @@ import {Server} from "socket.io";
 import http from "http";
 import express from "express";
 import {incrementUnreadCount} from "../services/unread.service.js";
+import GroupChat from "../models/groupChatModel.js";
 
 const app = express();
 
@@ -100,6 +101,73 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Handle new group message events
+    socket.on("newGroupMessage", async (messageData) => {
+        console.log("New group message received:", messageData);
+        const { groupId, senderId, tempId } = messageData;
+        
+        // Skip if this is a message that already has a MongoDB ID (already saved)
+        // This prevents duplicate messages from being sent
+        if (messageData._id && messageData._id.toString().length === 24) {
+            console.log("Skipping already saved message:", messageData._id);
+            return;
+        }
+
+        try {
+            // Find the group to get all members
+            const groupChat = await GroupChat.findById(groupId);
+            if (!groupChat) {
+                console.error("Group not found:", groupId);
+                return;
+            }
+
+            // Create a copy of the message data to send
+            const messageToSend = {...messageData};
+
+            // If the message doesn't have a real _id but has a tempId, use tempId as temporary _id
+            if (!messageToSend._id && tempId) {
+                messageToSend._id = tempId;
+                console.log("Using temporary ID for group message:", tempId);
+            }
+
+            // Send to all group members except the sender
+            groupChat.members.forEach(memberId => {
+                if (memberId.toString() !== senderId) { // Don't send to self
+                    const memberSocketId = getReceiverSocketId(memberId.toString());
+                    if (memberSocketId) {
+                        console.log(`Emitting group message to member ${memberId}, socket: ${memberSocketId}`);
+                        io.to(memberSocketId).emit("newGroupMessage", messageToSend);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error processing group message:", error);
+        }
+    });
+
+    // Handle group message read events
+    socket.on("markGroupMessageAsRead", data => {
+        console.log("Group message read event received:", data);
+        const { messageId, groupId, readerId, senderId } = data;
+
+        if (!messageId || !readerId || !senderId) {
+            console.error("Invalid markGroupMessageAsRead data:", data);
+            return;
+        }
+
+        // Notify the sender that their message was read
+        const senderSocketId = getReceiverSocketId(senderId);
+        if (senderSocketId) {
+            console.log(`Notifying sender ${senderId} that group message ${messageId} was read by ${readerId}`);
+            io.to(senderSocketId).emit("groupMessageRead", {
+                messageId,
+                groupId,
+                readerId,
+                readAt: new Date()
+            });
+        }
+    });
+
     // Handle message read events
     socket.on("markAsRead", async (data) => {
         console.log("Mark as read event received:", data);
@@ -125,6 +193,28 @@ io.on("connection", (socket) => {
         }
     });
 
+    socket.on("joinGroup", ({ groupId, userId }) => {
+        console.log(`User ${userId} joining group ${groupId}`);
+        socket.join(`group:${groupId}`);
+    });
+
+    socket.on("leaveGroup", ({ groupId, userId }) => {
+        console.log(`User ${userId} leaving group ${groupId}`);
+        socket.leave(`group:${groupId}`);
+    });
+
+    socket.on("typing", ({senderId, receiverId, isTyping}) => {
+        const receiverSocketId = getReceiverSocketId(receiverId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("typing", {senderId, isTyping});
+        }
+    });
+
+    socket.on("typingInGroup", ({senderId, groupId, isTyping}) => {
+        console.log(`User ${senderId} is ${isTyping ? 'typing' : 'not typing'} in group ${groupId}`);
+        socket.to(`group:${groupId}`).emit("typingInGroup", {senderId, groupId, isTyping});
+    });
+
     socket.on("disconnect", () => {
         console.log("user disconnected", socket.id);
 
@@ -141,13 +231,6 @@ io.on("connection", (socket) => {
             emitOnlineUsers();
         }
     });
-
-    // for typing indicator
-    socket.on("typing", ({senderId, receiverId, isTyping}) => {
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("typing", {senderId, isTyping});
-        }
-    });
 });
+
 export {app, io, server};

@@ -4,6 +4,12 @@ const socket = io('http://localhost:8080', {autoConnect: false});
 let currentChatUser = null;
 let currentUserId = null; // Store the user ID in variable
 let unreadMessages = {}; // Track unread messages by user ID
+let groupUnreadCounts = {}; // Track unread messages for groups
+let currentGroupChat = null; // Current open group chat
+let userGroups = []; // Store user's groups
+let allUsers = []; // Store all users for reference
+let isGroupChat = false; // Flag to indicate if current chat is a group chat
+
 const messageInput = document.getElementById('user-input');
 const typingIndicator = document.getElementById('typing-indicator');
 let typingTimeout;
@@ -55,6 +61,9 @@ const fetchUserData = () => {
                 console.log("Socket connected with ID:", socket.id);
                 socket.emit('setUserId', {userId: currentUserId});
             });
+            
+            // Set up all socket event listeners
+            setupSocketListeners();
 
             // Update profile picture
             const userImage = document.querySelector('.user-image');
@@ -169,8 +178,11 @@ const fetchUsersList = async () => {
  * @param {Array} users Array of user objects
  */
 const populateUsersInSidebar = (users) => {
-    const chatRoomsContainer = document.querySelector('.chat-rooms');
-    chatRoomsContainer.innerHTML = ''; // Clear existing users first
+    const directChatsContainer = document.getElementById('direct-chats');
+    directChatsContainer.innerHTML = ''; // Clear existing users first
+    
+    // Store all users for reference when creating groups
+    allUsers = users;
 
     users.forEach(user => {
         const userElement = document.createElement('div');
@@ -202,11 +214,16 @@ const populateUsersInSidebar = (users) => {
             // Add selected class to current and remove from others
             document.querySelectorAll('.chat-room').forEach(el => el.classList.remove('selected'));
             userElement.classList.add('selected');
+            
+            // Reset group chat state
+            isGroupChat = false;
+            currentGroupChat = null;
+            document.getElementById('chat-header-actions').style.display = 'none';
 
             openChatWithUser(user).then(r => console.log('Chat opened with:', user.fullName || user.username));
         });
 
-        chatRoomsContainer.appendChild(userElement);
+        directChatsContainer.appendChild(userElement);
     });
 };
 
@@ -811,24 +828,30 @@ const sendMessage = async (user) => {
 };
 
 /**
- * Set up settings dropdown functionality
+ * Set up settings dropdown toggle
  */
 const setupSettingsDropdown = () => {
     const settingsIcon = document.querySelector('.settings-icon');
     const settingsDropdown = document.querySelector('.settings-dropdown');
-
-    // Toggle dropdown visibility on settings icon click
-    settingsIcon.addEventListener('click', (event) => {
-        event.stopPropagation(); // Prevent click event from propagating
-        settingsDropdown.style.display = settingsDropdown.style.display === 'flex' ? 'none' : 'flex';
-    });
-
-    // Close dropdown if clicked outside
-    document.addEventListener('click', (event) => {
-        if (!settingsIcon.contains(event.target) && !settingsDropdown.contains(event.target)) {
-            settingsDropdown.style.display = 'none';
-        }
-    });
+    
+    if (settingsIcon && settingsDropdown) {
+        settingsIcon.addEventListener('click', (event) => {
+            event.stopPropagation();
+            settingsDropdown.style.display = settingsDropdown.style.display === 'flex' ? 'none' : 'flex';
+        });
+        
+        // Close dropdown when clicking elsewhere
+        document.addEventListener('click', () => {
+            if (settingsDropdown.style.display === 'flex') {
+                settingsDropdown.style.display = 'none';
+            }
+        });
+        
+        // Prevent dropdown from closing when clicking inside it
+        settingsDropdown.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+    }
 };
 
 /**
@@ -879,15 +902,34 @@ const updateOnlineStatus = (onlineUserIds) => {
  * Initialize the chat application
  */
 const initializeChat = () => {
+    // Fetch user data (this sets up socket connection and socket listeners)
     fetchUserData();
+    
+    // Load lists of users and groups
     fetchUsersList();
+    fetchUserGroups();
+    
+    // Set up UI components
     setupSignOutButton();
     setupSettingsDropdown();
+    setupTabSwitching();
+    setupGroupChatUI();
+    
+    // Set up search functionality if it exists
+    if (typeof setupSearchBar === 'function') {
+        setupSearchBar();
+    }
 
     // Set up the send message button
     const sendButton = document.getElementById('send-btn');
     if (sendButton) {
-        sendButton.addEventListener('click', () => sendMessage());
+        sendButton.addEventListener('click', () => {
+            if (isGroupChat) {
+                sendGroupMessage();
+            } else {
+                sendMessage();
+            }
+        });
     }
 
     // Set up the enter key to send messages
@@ -895,10 +937,33 @@ const initializeChat = () => {
         messageInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
-                sendMessage();
+                if (isGroupChat) {
+                    sendGroupMessage();
+                } else {
+                    sendMessage();
+                }
+            }
+        });
+
+        // Set up typing indicator events
+        messageInput.addEventListener('input', () => {
+            if (isGroupChat && currentGroupChat) {
+                handleGroupTyping(true);
+            } else if (currentChatUser) {
+                handleTyping(true);
+            }
+        });
+
+        messageInput.addEventListener('blur', () => {
+            if (isGroupChat && currentGroupChat) {
+                handleGroupTyping(false);
+            } else if (currentChatUser) {
+                handleTyping(false);
             }
         });
     }
+    
+    console.log("Chat application initialized");
 };
 
 // Initialize the chat when the DOM is fully loaded
@@ -981,3 +1046,1310 @@ socket.on('typing', (data) => {
         typingIndicator.style.display = isTyping ? 'inline-block' : 'none';
     }
 });
+
+/**
+ * Set up tab switching between direct messages and group chats
+ */
+const setupTabSwitching = () => {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const directChats = document.getElementById('direct-chats');
+    const groupChats = document.getElementById('group-chats');
+
+    tabButtons.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Handle tab selection UI
+            tabButtons.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show/hide content based on selected tab
+            if (tab.getAttribute('data-tab') === 'direct') {
+                directChats.style.display = 'block';
+                groupChats.style.display = 'none';
+                // If we were in a group chat, close it
+                if (isGroupChat) {
+                    isGroupChat = false;
+                    currentGroupChat = null;
+                    document.getElementById('chat-header-actions').style.display = 'none';
+                    document.getElementById('chat-title').textContent = 'Select a chat';
+                    document.getElementById('chat-content').innerHTML = '';
+                }
+            } else {
+                directChats.style.display = 'none';
+                groupChats.style.display = 'block';
+                // If we were in a direct chat, close it
+                if (!isGroupChat && currentChatUser) {
+                    currentChatUser = null;
+                    document.getElementById('chat-title').textContent = 'Select a group';
+                    document.getElementById('chat-content').innerHTML = '';
+                }
+            }
+        });
+    });
+};
+
+/**
+ * Set up group chat related UI elements and event listeners
+ */
+const setupGroupChatUI = () => {
+    // Set up create group button
+    const createGroupBtn = document.getElementById('create-group-btn');
+    const createGroupModal = document.getElementById('create-group-modal');
+    const closeButtons = document.querySelectorAll('.close');
+    const createGroupSubmit = document.getElementById('create-group-submit');
+    
+    // Group info related elements
+    const groupInfoBtn = document.getElementById('group-info-btn');
+    const groupInfoModal = document.getElementById('group-info-modal');
+    const addMemberBtn = document.getElementById('add-member-btn');
+    const deleteGroupBtn = document.getElementById('delete-group-btn');
+
+    // Set up modal open/close
+    if (createGroupBtn) {
+        createGroupBtn.addEventListener('click', () => {
+            createGroupModal.style.display = 'block';
+            populateMemberSelection();
+        });
+    }
+
+    if (groupInfoBtn) {
+        groupInfoBtn.addEventListener('click', () => {
+            if (currentGroupChat) {
+                openGroupInfo(currentGroupChat);
+            }
+        });
+    }
+
+    closeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            createGroupModal.style.display = 'none';
+            groupInfoModal.style.display = 'none';
+        });
+    });
+
+    // Close modals when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === createGroupModal) {
+            createGroupModal.style.display = 'none';
+        }
+        if (e.target === groupInfoModal) {
+            groupInfoModal.style.display = 'none';
+        }
+    });
+
+    // Set up group creation
+    if (createGroupSubmit) {
+        createGroupSubmit.addEventListener('click', createNewGroup);
+    }
+
+    // Set up add member functionality
+    if (addMemberBtn) {
+        addMemberBtn.addEventListener('click', addMemberToGroup);
+    }
+
+    // Set up delete group functionality
+    if (deleteGroupBtn) {
+        deleteGroupBtn.addEventListener('click', deleteGroup);
+    }
+
+    // Fetch user's groups initially
+    fetchUserGroups();
+};
+
+/**
+ * Populate the member selection list in the create group modal
+ */
+const populateMemberSelection = () => {
+    const memberSelection = document.getElementById('member-selection');
+    memberSelection.innerHTML = '';
+
+    // If we have users, populate the selection
+    if (allUsers && allUsers.length > 0) {
+        allUsers.forEach(user => {
+            // Don't include current user in the selection
+            if (user._id !== currentUserId) {
+                const memberItem = document.createElement('div');
+                memberItem.classList.add('member-item');
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = user._id;
+                checkbox.id = `member-${user._id}`;
+
+                const label = document.createElement('label');
+                label.htmlFor = `member-${user._id}`;
+                label.textContent = user.fullName || user.username;
+
+                memberItem.appendChild(checkbox);
+                memberItem.appendChild(label);
+                memberSelection.appendChild(memberItem);
+            }
+        });
+    } else {
+        memberSelection.innerHTML = '<p>No users available</p>';
+    }
+};
+
+/**
+ * Fetch user's group chats
+ */
+const fetchUserGroups = async () => {
+    try {
+        const response = await fetch('http://localhost:8080/api/groups', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch groups');
+        }
+
+        const groups = await response.json();
+        userGroups = groups;
+        displayUserGroups(groups);
+
+        // Fetch unread counts for all groups
+        fetchGroupsUnreadCounts();
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+    }
+};
+
+/**
+ * Display user's group chats in the sidebar
+ * @param {Array} groups - Array of group chat objects
+ */
+const displayUserGroups = (groups) => {
+    const groupChatsContainer = document.getElementById('group-chats');
+    groupChatsContainer.innerHTML = '';
+
+    if (groups.length === 0) {
+        const noGroupsMsg = document.createElement('div');
+        noGroupsMsg.classList.add('no-groups-message');
+        noGroupsMsg.textContent = 'You have no groups yet. Create a group to get started!';
+        groupChatsContainer.appendChild(noGroupsMsg);
+        return;
+    }
+
+    groups.forEach(group => {
+        const groupElement = document.createElement('div');
+        groupElement.classList.add('chat-room', 'group-item');
+        groupElement.setAttribute('data-group-id', group._id);
+
+        // Group icon or initial
+        const groupIcon = document.createElement('div');
+        groupIcon.classList.add('group-icon');
+        groupIcon.textContent = group.name.charAt(0).toUpperCase();
+
+        // Group details container
+        const groupDetails = document.createElement('div');
+        groupDetails.classList.add('group-details');
+
+        // Group name
+        const groupName = document.createElement('div');
+        groupName.classList.add('group-name');
+        groupName.textContent = group.name;
+
+        // Add role tags
+        if (group.creator._id === currentUserId) {
+            const creatorTag = document.createElement('span');
+            creatorTag.classList.add('group-tag', 'creator-tag');
+            creatorTag.textContent = 'Creator';
+            groupName.appendChild(creatorTag);
+        } else if (group.admins.some(admin => admin._id === currentUserId)) {
+            const adminTag = document.createElement('span');
+            adminTag.classList.add('group-tag', 'admin-tag');
+            adminTag.textContent = 'Admin';
+            groupName.appendChild(adminTag);
+        }
+
+        // Group description
+        const groupDescription = document.createElement('div');
+        groupDescription.classList.add('group-description');
+        groupDescription.textContent = group.description || `${group.members.length} members`;
+
+        // Append elements to group details
+        groupDetails.appendChild(groupName);
+        groupDetails.appendChild(groupDescription);
+
+        // Add unread message badge if there are unread messages
+        if (groupUnreadCounts[group._id] && groupUnreadCounts[group._id] > 0) {
+            const badge = document.createElement('span');
+            badge.classList.add('unread-badge');
+            badge.textContent = groupUnreadCounts[group._id] > 99 ? '99+' : groupUnreadCounts[group._id].toString();
+            groupElement.appendChild(badge);
+        }
+
+        // Append elements to group container
+        groupElement.appendChild(groupIcon);
+        groupElement.appendChild(groupDetails);
+
+        // Add click event to open chat
+        groupElement.addEventListener('click', () => {
+            // Add selected class to current and remove from others
+            document.querySelectorAll('.chat-room').forEach(el => el.classList.remove('selected'));
+            groupElement.classList.add('selected');
+
+            openGroupChat(group);
+        });
+
+        groupChatsContainer.appendChild(groupElement);
+    });
+};
+
+/**
+ * Open a group chat and load its messages
+ * @param {Object} group - Group chat object
+ */
+const openGroupChat = async (group) => {
+    // Set the current state
+    isGroupChat = true;
+    currentGroupChat = group;
+    currentChatUser = null; // Clear the direct chat user
+
+    // Update UI
+    const chatTitle = document.getElementById('chat-title');
+    chatTitle.textContent = group.name;
+
+    // Show group info button 
+    document.getElementById('chat-header-actions').style.display = 'flex';
+
+    // Clear previous chat content
+    const chatContent = document.getElementById('chat-content');
+    chatContent.innerHTML = '';
+
+    // Fetch messages for the group
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${group._id}/messages`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch group messages');
+        }
+
+        const messages = await response.json();
+        displayGroupMessages(messages, group);
+
+        // Mark all messages as read
+        markAllGroupMessagesAsRead(group._id);
+
+        // Join the group socket room
+        socket.emit('joinGroup', { groupId: group._id, userId: currentUserId });
+
+    } catch (error) {
+        console.error('Error opening group chat:', error);
+    }
+};
+
+/**
+ * Display messages for a group chat
+ * @param {Array} messages - Array of message objects
+ * @param {Object} group - Group chat object
+ */
+const displayGroupMessages = (messages, group) => {
+    const chatContent = document.getElementById('chat-content');
+    chatContent.innerHTML = ''; // Clear existing messages
+    
+    messages.forEach(message => {
+        const isSent = message.senderId._id === currentUserId;
+        processGroupMessage(message, isSent);
+    });
+    
+    // Scroll to bottom
+    chatContent.scrollTop = chatContent.scrollHeight;
+};
+
+/**
+ * Fetch unread counts for all groups
+ */
+const fetchGroupsUnreadCounts = async () => {
+    try {
+        const response = await fetch('http://localhost:8080/api/groups/unread/all', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch group unread counts');
+        }
+
+        groupUnreadCounts = await response.json();
+        updateGroupUnreadBadges();
+    } catch (error) {
+        console.error('Error fetching group unread counts:', error);
+    }
+};
+
+/**
+ * Update unread badges for all groups
+ */
+const updateGroupUnreadBadges = () => {
+    const groupItems = document.querySelectorAll('#group-chats .group-item');
+    
+    groupItems.forEach(groupElement => {
+        const groupId = groupElement.getAttribute('data-group-id');
+        
+        // Remove existing badge if any
+        const existingBadge = groupElement.querySelector('.unread-badge');
+        if (existingBadge) {
+            groupElement.removeChild(existingBadge);
+        }
+        
+        // Add new badge if there are unread messages
+        if (groupUnreadCounts[groupId] && groupUnreadCounts[groupId] > 0) {
+            const badge = document.createElement('span');
+            badge.classList.add('unread-badge');
+            badge.textContent = groupUnreadCounts[groupId] > 99 ? '99+' : groupUnreadCounts[groupId].toString();
+            groupElement.appendChild(badge);
+        }
+    });
+};
+
+/**
+ * Mark all messages in a group as read
+ * @param {string} groupId - ID of the group
+ */
+const markAllGroupMessagesAsRead = async (groupId) => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${groupId}/messages/read/all`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to mark messages as read');
+        }
+
+        // Update unread counts
+        groupUnreadCounts[groupId] = 0;
+        updateGroupUnreadBadges();
+    } catch (error) {
+        console.error('Error marking messages as read:', error);
+    }
+};
+
+/**
+ * Create a new group chat
+ */
+const createNewGroup = async () => {
+    const groupName = document.getElementById('group-name').value.trim();
+    const groupDescription = document.getElementById('group-description').value.trim();
+    const memberCheckboxes = document.querySelectorAll('#member-selection input[type="checkbox"]:checked');
+    
+    if (!groupName) {
+        alert('Please enter a group name.');
+        return;
+    }
+    
+    if (memberCheckboxes.length === 0) {
+        alert('Please select at least one member for the group.');
+        return;
+    }
+    
+    // Get selected member IDs
+    const members = Array.from(memberCheckboxes).map(checkbox => checkbox.value);
+    
+    try {
+        const response = await fetch('http://localhost:8080/api/groups', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: groupName,
+                description: groupDescription,
+                members
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create group');
+        }
+        
+        const newGroup = await response.json();
+        
+        // Add the new group to our list and refresh display
+        userGroups.push(newGroup);
+        displayUserGroups(userGroups);
+        
+        // Close the modal
+        document.getElementById('create-group-modal').style.display = 'none';
+        
+        // Clear the form
+        document.getElementById('group-name').value = '';
+        document.getElementById('group-description').value = '';
+        
+        // Switch to the groups tab and open the new group
+        document.querySelector('.tab-btn[data-tab="groups"]').click();
+        openGroupChat(newGroup);
+        
+    } catch (error) {
+        console.error('Error creating group:', error);
+        alert('Failed to create group. Please try again.');
+    }
+};
+
+/**
+ * Send a message to the current group chat
+ */
+const sendGroupMessage = async () => {
+    if (!currentGroupChat) {
+        console.error('No group selected for chat.');
+        return;
+    }
+    
+    const message = messageInput.value.trim();
+    
+    if (!message) {
+        return;
+    }
+    
+    // Create a temporary message object for immediate display
+    const tempMessageId = 'temp-' + Date.now();
+    const tempMessageObj = {
+        _id: tempMessageId,
+        senderId: { _id: currentUserId },
+        groupId: currentGroupChat._id,
+        message: message,
+        createdAt: new Date(),
+        readBy: [currentUserId]
+    };
+    
+    // Display the message immediately with 'pending' state
+    const messageElement = processGroupMessage(tempMessageObj, true);
+    messageElement.classList.add('pending');
+    
+    // Add a pending indicator
+    const pendingIndicator = document.createElement('span');
+    pendingIndicator.classList.add('pending-indicator');
+    pendingIndicator.innerHTML = '⌛';
+    pendingIndicator.title = 'Sending...';
+    messageElement.appendChild(pendingIndicator);
+    
+    // Clear input field
+    messageInput.value = '';
+    
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${currentGroupChat._id}/messages`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message,
+                tempId: tempMessageId
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to send message');
+        }
+        
+        const sentMessage = await response.json();
+        
+        // Update the temporary message with the real one
+        messageElement.classList.remove('pending');
+        messageElement.removeChild(pendingIndicator);
+        messageElement.setAttribute('data-message-id', sentMessage._id);
+        
+        // Add read status
+        const readStatus = document.createElement('span');
+        readStatus.classList.add('read-status', 'delivered');
+        readStatus.textContent = `Read by 1/${currentGroupChat.members.length - 1}`;
+        messageElement.appendChild(readStatus);
+        
+        // DO NOT emit an additional socket event - the server already does this when saving the message
+        // socket.emit('newGroupMessage', {
+        //     groupId: currentGroupChat._id,
+        //     senderId: currentUserId,
+        //     message: message,
+        //     _id: sentMessage._id,
+        //     tempId: tempMessageId,
+        //     createdAt: sentMessage.createdAt || new Date(),
+        //     readBy: sentMessage.readBy || [currentUserId]
+        // });
+        
+    } catch (error) {
+        console.error('Error sending group message:', error);
+        
+        // Show error state for the message
+        messageElement.classList.add('failed');
+        pendingIndicator.innerHTML = '❌';
+        pendingIndicator.title = 'Failed to send message';
+    }
+};
+
+/**
+ * Open the group info modal for a group
+ * @param {Object} group - Group chat object
+ */
+const openGroupInfo = (group) => {
+    const modal = document.getElementById('group-info-modal');
+    const titleElem = document.getElementById('group-info-title');
+    const descriptionElem = document.getElementById('group-info-description');
+    const creatorElem = document.getElementById('group-creator-name');
+    const membersList = document.getElementById('group-members-list');
+    const adminActions = document.getElementById('admin-actions');
+    const creatorActions = document.getElementById('creator-actions');
+    
+    // Set basic group info
+    titleElem.textContent = group.name;
+    descriptionElem.textContent = group.description || 'No description';
+    creatorElem.textContent = group.creator.fullName || group.creator.username;
+    
+    // Clear members list
+    membersList.innerHTML = '';
+    
+    // Check user's role in the group
+    const isCreator = group.creator._id === currentUserId;
+    const isAdmin = group.admins.some(admin => admin._id === currentUserId);
+    
+    // Show/hide admin actions
+    adminActions.style.display = isAdmin ? 'block' : 'none';
+    
+    // Show/hide creator actions
+    creatorActions.style.display = isCreator ? 'block' : 'none';
+    
+    // Populate members list
+    group.members.forEach(member => {
+        const memberRow = document.createElement('div');
+        memberRow.classList.add('member-row');
+        
+        // Member info
+        const memberInfo = document.createElement('div');
+        memberInfo.classList.add('member-info');
+        
+        const memberName = document.createElement('div');
+        memberName.classList.add('member-name');
+        memberName.textContent = member.fullName || member.username;
+        
+        // Add role tag if applicable
+        if (member._id === group.creator._id) {
+            const roleTag = document.createElement('span');
+            roleTag.classList.add('group-tag', 'creator-tag');
+            roleTag.textContent = 'Creator';
+            memberName.appendChild(roleTag);
+        } else if (group.admins.some(admin => admin._id === member._id)) {
+            const roleTag = document.createElement('span');
+            roleTag.classList.add('group-tag', 'admin-tag');
+            roleTag.textContent = 'Admin';
+            memberName.appendChild(roleTag);
+        }
+        
+        memberInfo.appendChild(memberName);
+        memberRow.appendChild(memberInfo);
+        
+        // Add action buttons if user is admin
+        if ((isAdmin || isCreator) && member._id !== currentUserId) {
+            const actionDiv = document.createElement('div');
+            actionDiv.classList.add('member-actions');
+            
+            if (isCreator) {
+                // Only creator can manage admins
+                const isAdminMember = group.admins.some(admin => admin._id === member._id);
+                
+                if (isAdminMember) {
+                    // Option to demote admin
+                    const demoteBtn = document.createElement('button');
+                    demoteBtn.classList.add('demote-btn');
+                    demoteBtn.textContent = 'Demote';
+                    demoteBtn.addEventListener('click', () => removeAdmin(group._id, member._id));
+                    actionDiv.appendChild(demoteBtn);
+                } else {
+                    // Option to promote to admin
+                    const promoteBtn = document.createElement('button');
+                    promoteBtn.classList.add('promote-btn');
+                    promoteBtn.textContent = 'Make Admin';
+                    promoteBtn.addEventListener('click', () => makeAdmin(group._id, member._id));
+                    actionDiv.appendChild(promoteBtn);
+                }
+            }
+            
+            // Both admins and creator can remove members
+            const removeBtn = document.createElement('button');
+            removeBtn.classList.add('remove-btn');
+            removeBtn.textContent = 'Remove';
+            removeBtn.addEventListener('click', () => removeMemberFromGroup(group._id, member._id));
+            actionDiv.appendChild(removeBtn);
+            
+            memberRow.appendChild(actionDiv);
+        }
+        
+        membersList.appendChild(memberRow);
+    });
+    
+    // Populate add member dropdown if user is admin
+    if (isAdmin || isCreator) {
+        const addMemberDropdown = document.getElementById('add-member-input');
+        addMemberDropdown.innerHTML = '';
+        
+        // Get users who are not in the group
+        const nonMembers = allUsers.filter(user => 
+            user._id !== currentUserId && 
+            !group.members.some(member => member._id === user._id)
+        );
+        
+        if (nonMembers.length === 0) {
+            const option = document.createElement('option');
+            option.disabled = true;
+            option.selected = true;
+            option.textContent = 'No users available';
+            addMemberDropdown.appendChild(option);
+        } else {
+            const defaultOption = document.createElement('option');
+            defaultOption.disabled = true;
+            defaultOption.selected = true;
+            defaultOption.textContent = 'Select a user';
+            addMemberDropdown.appendChild(defaultOption);
+            
+            nonMembers.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user._id;
+                option.textContent = user.fullName || user.username;
+                addMemberDropdown.appendChild(option);
+            });
+        }
+    }
+    
+    // Show the modal
+    modal.style.display = 'block';
+};
+
+/**
+ * Add a member to the current group
+ */
+const addMemberToGroup = async () => {
+    if (!currentGroupChat) return;
+    
+    const memberDropdown = document.getElementById('add-member-input');
+    const memberId = memberDropdown.value;
+    
+    if (!memberId || memberId === 'Select a user') {
+        alert('Please select a user to add');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${currentGroupChat._id}/members`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                members: [memberId]
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add member');
+        }
+        
+        const updatedGroup = await response.json();
+        
+        // Update our local group data
+        currentGroupChat = updatedGroup;
+        
+        // Update the group in userGroups
+        const groupIndex = userGroups.findIndex(g => g._id === updatedGroup._id);
+        if (groupIndex !== -1) {
+            userGroups[groupIndex] = updatedGroup;
+        }
+        
+        // Refresh the group info modal
+        openGroupInfo(updatedGroup);
+        
+        // Show success message
+        alert('Member added successfully');
+        
+    } catch (error) {
+        console.error('Error adding member:', error);
+        alert('Failed to add member');
+    }
+};
+
+/**
+ * Remove a member from a group
+ * @param {string} groupId - ID of the group
+ * @param {string} memberId - ID of the member to remove
+ */
+const removeMemberFromGroup = async (groupId, memberId) => {
+    if (!confirm('Are you sure you want to remove this member?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${groupId}/members/${memberId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to remove member');
+        }
+        
+        const updatedGroup = await response.json();
+        
+        // Update our local group data
+        if (currentGroupChat && currentGroupChat._id === groupId) {
+            currentGroupChat = updatedGroup;
+        }
+        
+        // Update the group in userGroups
+        const groupIndex = userGroups.findIndex(g => g._id === updatedGroup._id);
+        if (groupIndex !== -1) {
+            userGroups[groupIndex] = updatedGroup;
+        }
+        
+        // Refresh the group info modal
+        openGroupInfo(updatedGroup);
+        
+        // Show success message
+        alert('Member removed successfully');
+        
+    } catch (error) {
+        console.error('Error removing member:', error);
+        alert('Failed to remove member');
+    }
+};
+
+/**
+ * Make a user an admin of a group
+ * @param {string} groupId - ID of the group
+ * @param {string} memberId - ID of the member to promote
+ */
+const makeAdmin = async (groupId, memberId) => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${groupId}/admins/${memberId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to make admin');
+        }
+        
+        const updatedGroup = await response.json();
+        
+        // Update our local group data
+        if (currentGroupChat && currentGroupChat._id === groupId) {
+            currentGroupChat = updatedGroup;
+        }
+        
+        // Update the group in userGroups
+        const groupIndex = userGroups.findIndex(g => g._id === updatedGroup._id);
+        if (groupIndex !== -1) {
+            userGroups[groupIndex] = updatedGroup;
+        }
+        
+        // Refresh the group info modal
+        openGroupInfo(updatedGroup);
+        
+        // Show success message
+        alert('User is now an admin');
+        
+    } catch (error) {
+        console.error('Error making admin:', error);
+        alert('Failed to make admin');
+    }
+};
+
+/**
+ * Remove admin status from a user
+ * @param {string} groupId - ID of the group
+ * @param {string} adminId - ID of the admin to demote
+ */
+const removeAdmin = async (groupId, adminId) => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${groupId}/admins/${adminId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to remove admin');
+        }
+        
+        const updatedGroup = await response.json();
+        
+        // Update our local group data
+        if (currentGroupChat && currentGroupChat._id === groupId) {
+            currentGroupChat = updatedGroup;
+        }
+        
+        // Update the group in userGroups
+        const groupIndex = userGroups.findIndex(g => g._id === updatedGroup._id);
+        if (groupIndex !== -1) {
+            userGroups[groupIndex] = updatedGroup;
+        }
+        
+        // Refresh the group info modal
+        openGroupInfo(updatedGroup);
+        
+        // Show success message
+        alert('Admin status removed');
+        
+    } catch (error) {
+        console.error('Error removing admin:', error);
+        alert('Failed to remove admin');
+    }
+};
+
+/**
+ * Delete a group chat
+ */
+const deleteGroup = async () => {
+    if (!currentGroupChat) return;
+    
+    if (!confirm(`Are you sure you want to delete the group "${currentGroupChat.name}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${currentGroupChat._id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete group');
+        }
+        
+        // Remove from local storage
+        userGroups = userGroups.filter(g => g._id !== currentGroupChat._id);
+        
+        // Refresh the UI
+        displayUserGroups(userGroups);
+        
+        // Close the modal
+        document.getElementById('group-info-modal').style.display = 'none';
+        
+        // Clear the chat area
+        const chatTitle = document.getElementById('chat-title');
+        chatTitle.textContent = 'Select a chat';
+        
+        document.getElementById('chat-content').innerHTML = '';
+        document.getElementById('chat-header-actions').style.display = 'none';
+        
+        currentGroupChat = null;
+        isGroupChat = false;
+        
+        // Show success message
+        alert('Group deleted successfully');
+        
+    } catch (error) {
+        console.error('Error deleting group:', error);
+        alert('Failed to delete group');
+    }
+};
+
+/**
+ * Handle typing indicator for group chats
+ * @param {boolean} isTyping - Whether the user is typing
+ */
+const handleGroupTyping = (isTyping) => {
+    if (!currentGroupChat) return;
+    
+    // Clear any existing timeout
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+    }
+    
+    // Emit typing event
+    socket.emit('typingInGroup', {
+        senderId: currentUserId,
+        groupId: currentGroupChat._id,
+        isTyping
+    });
+    
+    // If typing has stopped, set a timeout to ensure it stops after a while
+    if (!isTyping) {
+        typingTimeout = setTimeout(() => {
+            socket.emit('typingInGroup', {
+                senderId: currentUserId,
+                groupId: currentGroupChat._id,
+                isTyping: false
+            });
+        }, 1000);
+    }
+};
+
+/**
+ * Set up socket event listeners for group chat functionality
+ */
+const setupSocketListeners = () => {
+    // Existing socket handlers for direct messages
+    socket.on('messageRead', (data) => {
+        console.log('Message read event received:', data);
+        updateMessageReadStatus(data.messageId);
+    });
+    
+    socket.on('getOnlineUsers', (onlineUserIds) => {
+        console.log('Online users received:', onlineUserIds);
+        updateOnlineStatus(onlineUserIds);
+    });
+    
+    socket.on('typing', ({senderId, isTyping}) => {
+        if (currentChatUser && senderId === currentChatUser._id) {
+            if (isTyping) {
+                typingIndicator.style.display = 'block';
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+        }
+    });
+    
+    // New handlers for group chat
+    
+    // New group chat created or added to
+    socket.on('newGroupChat', (group) => {
+        console.log('New group chat received:', group);
+        
+        // Check if we already have this group
+        const existingIndex = userGroups.findIndex(g => g._id === group._id);
+        if (existingIndex !== -1) {
+            userGroups[existingIndex] = group;
+        } else {
+            userGroups.push(group);
+        }
+        
+        // Refresh the groups list
+        displayUserGroups(userGroups);
+    });
+    
+    // Group chat updated
+    socket.on('groupChatUpdated', (updatedGroup) => {
+        console.log('Group chat updated:', updatedGroup);
+        
+        // Update in our list
+        const groupIndex = userGroups.findIndex(g => g._id === updatedGroup._id);
+        if (groupIndex !== -1) {
+            userGroups[groupIndex] = updatedGroup;
+            displayUserGroups(userGroups);
+        }
+        
+        // If this is the currently open group, update the current data
+        if (currentGroupChat && currentGroupChat._id === updatedGroup._id) {
+            currentGroupChat = updatedGroup;
+            
+            // If the group info modal is open, refresh it
+            if (document.getElementById('group-info-modal').style.display === 'block') {
+                openGroupInfo(updatedGroup);
+            }
+        }
+    });
+    
+    // Removed from group
+    socket.on('removedFromGroup', ({groupId, groupName}) => {
+        console.log('Removed from group:', groupId);
+        
+        // Remove from our list
+        userGroups = userGroups.filter(g => g._id !== groupId);
+        displayUserGroups(userGroups);
+        
+        // If this was the current group, close it
+        if (currentGroupChat && currentGroupChat._id === groupId) {
+            document.getElementById('chat-title').textContent = 'Select a chat';
+            document.getElementById('chat-content').innerHTML = '';
+            document.getElementById('chat-header-actions').style.display = 'none';
+            currentGroupChat = null;
+            isGroupChat = false;
+        }
+        
+        // Close modal if open
+        document.getElementById('group-info-modal').style.display = 'none';
+        
+        // Show notification
+        alert(`You have been removed from the group: ${groupName}`);
+    });
+    
+    // Group deleted
+    socket.on('groupChatDeleted', ({groupId, groupName}) => {
+        console.log('Group chat deleted:', groupId);
+        
+        // Remove from our list
+        userGroups = userGroups.filter(g => g._id !== groupId);
+        displayUserGroups(userGroups);
+        
+        // If this was the current group, close it
+        if (currentGroupChat && currentGroupChat._id === groupId) {
+            document.getElementById('chat-title').textContent = 'Select a chat';
+            document.getElementById('chat-content').innerHTML = '';
+            document.getElementById('chat-header-actions').style.display = 'none';
+            currentGroupChat = null;
+            isGroupChat = false;
+        }
+        
+        // Close modal if open
+        document.getElementById('group-info-modal').style.display = 'none';
+        
+        // Show notification
+        alert(`The group "${groupName}" has been deleted`);
+    });
+    
+    // Made admin of a group
+    socket.on('madeGroupAdmin', ({groupId, groupName}) => {
+        console.log('Made admin of group:', groupId);
+        
+        // Refresh groups to get latest data
+        fetchUserGroups();
+        
+        // Show notification
+        alert(`You are now an admin of the group: ${groupName}`);
+    });
+    
+    // Removed as admin
+    socket.on('removedAsGroupAdmin', ({groupId, groupName}) => {
+        console.log('Removed as admin from group:', groupId);
+        
+        // Refresh groups to get latest data
+        fetchUserGroups();
+        
+        // If the info modal is open and this is the current group, refresh it
+        if (currentGroupChat && currentGroupChat._id === groupId && 
+            document.getElementById('group-info-modal').style.display === 'block') {
+            fetchGroupDetails(groupId).then(group => {
+                if (group) openGroupInfo(group);
+            });
+        }
+        
+        // Show notification
+        alert(`You are no longer an admin of the group: ${groupName}`);
+    });
+    
+    // New group message
+    socket.on('newGroupMessage', (message) => {
+        console.log('New group message received:', message);
+        
+        // If this is for the current group chat, display it
+        if (currentGroupChat && message.groupId === currentGroupChat._id) {
+            processGroupMessage(message, false);
+        } else {
+            // Increment unread count for this group
+            if (!groupUnreadCounts[message.groupId]) {
+                groupUnreadCounts[message.groupId] = 0;
+            }
+            groupUnreadCounts[message.groupId]++;
+            updateGroupUnreadBadges();
+        }
+    });
+    
+    // Group message read
+    socket.on('groupMessageRead', (data) => {
+        console.log('Group message read:', data);
+        
+        // Update read status for the message if we're in the group chat
+        if (currentGroupChat && currentGroupChat._id === data.groupId) {
+            updateGroupMessageReadStatus(data.messageId);
+        }
+    });
+    
+    // Group typing indicator
+    socket.on('typingInGroup', ({senderId, groupId, isTyping}) => {
+        if (currentGroupChat && currentGroupChat._id === groupId && senderId !== currentUserId) {
+            // Find sender info
+            const sender = currentGroupChat.members.find(m => m._id === senderId);
+            const senderName = sender ? (sender.fullName || sender.username) : 'Someone';
+            
+            if (isTyping) {
+                typingIndicator.textContent = `${senderName} is typing...`;
+                typingIndicator.style.display = 'block';
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+        }
+    });
+};
+
+/**
+ * Mark a group message as read
+ * @param {string} messageId - ID of the message
+ * @param {string} senderId - ID of the sender
+ */
+const markGroupMessageAsRead = async (messageId, senderId) => {
+    try {
+        // First emit the read event via socket
+        socket.emit('markGroupMessageAsRead', {
+            messageId,
+            groupId: currentGroupChat._id,
+            readerId: currentUserId,
+            senderId
+        });
+        
+        // Then make the API call
+        const response = await fetch(`http://localhost:8080/api/groups/messages/read/${messageId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to mark message as read');
+        }
+    } catch (error) {
+        console.error('Error marking group message as read:', error);
+    }
+};
+
+/**
+ * Update the read status display for a group message
+ * @param {string} messageId - ID of the message
+ */
+const updateGroupMessageReadStatus = (messageId) => {
+    if (!currentGroupChat) return;
+    
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!messageElement) return;
+    
+    // Only update for sent messages (our own messages)
+    if (!messageElement.classList.contains('sent')) return;
+    
+    // Get the read status element or create one if it doesn't exist
+    let readStatus = messageElement.querySelector('.read-status');
+    if (!readStatus) {
+        readStatus = document.createElement('span');
+        readStatus.classList.add('read-status', 'delivered');
+        messageElement.appendChild(readStatus);
+    }
+    
+    // Fetch the latest message data to get accurate read count
+    fetchGroupMessageDetails(messageId).then(message => {
+        if (!message) return;
+        
+        const readCount = message.readBy.length - 1; // Subtract one for sender (self)
+        const totalMembers = currentGroupChat.members.length - 1; // Exclude self
+        
+        if (readCount === totalMembers) {
+            readStatus.classList.remove('delivered');
+            readStatus.classList.add('read');
+            readStatus.textContent = 'Read by all';
+        } else {
+            readStatus.textContent = `Read by ${readCount}/${totalMembers}`;
+        }
+    });
+};
+
+/**
+ * Fetch details for a specific group message
+ * @param {string} messageId - ID of the message
+ * @returns {Promise<Object|null>} - Message object or null
+ */
+const fetchGroupMessageDetails = async (messageId) => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${currentGroupChat._id}/messages`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch messages');
+        }
+        
+        const messages = await response.json();
+        return messages.find(msg => msg._id === messageId) || null;
+    } catch (error) {
+        console.error('Error fetching message details:', error);
+        return null;
+    }
+};
+
+/**
+ * Fetch details for a specific group
+ * @param {string} groupId - ID of the group
+ * @returns {Promise<Object|null>} - Group object or null
+ */
+const fetchGroupDetails = async (groupId) => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/groups/${groupId}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch group details');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching group details:', error);
+        return null;
+    }
+};
+
+/**
+ * Process and display a group message
+ * @param {Object} message - Message object
+ * @param {boolean} isFromCurrentUser - Whether the message is from the current user
+ */
+const processGroupMessage = (message, isFromCurrentUser = false) => {
+    if (!message || !currentGroupChat) return;
+    
+    // Get sender name
+    let senderName = isFromCurrentUser ? 'You' : 'Unknown User';
+    
+    if (!isFromCurrentUser) {
+        // If message has populated sender data
+        if (message.senderId && typeof message.senderId === 'object' && message.senderId.username) {
+            senderName = message.senderId.fullName || message.senderId.username;
+        } else {
+            // Try to find sender in group members
+            const sender = currentGroupChat.members.find(m => {
+                const memberId = typeof m === 'object' ? m._id : m;
+                const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId;
+                return memberId === senderId;
+            });
+            
+            if (sender && typeof sender === 'object') {
+                senderName = sender.fullName || sender.username;
+            }
+        }
+    }
+    
+    // Display the message
+    const chatContent = document.getElementById('chat-content');
+    const messageElement = createMessageElement(message, isFromCurrentUser, senderName);
+    chatContent.appendChild(messageElement);
+    chatContent.scrollTop = chatContent.scrollHeight;
+    
+    // Mark as read if not from current user
+    if (!isFromCurrentUser && message._id) {
+        markGroupMessageAsRead(message._id, typeof message.senderId === 'object' ? message.senderId._id : message.senderId);
+    }
+    
+    return messageElement;
+};

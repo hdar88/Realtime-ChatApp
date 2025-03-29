@@ -18,29 +18,93 @@
 			<div class="settings-container">
 				<img src="../assets/settings_icon_light.svg" alt="Settings" class="settings-icon">
 				<div class="settings-dropdown">
+					<button class="dropdown-item" id="create-group-btn">Create Group</button>
 					<button class="dropdown-item" id="sign-out-btn">Sign Out</button>
 					<button class="dropdown-item" id="settings-btn">Settings</button>
 				</div>
 			</div>
 		</div>
 
+		<!-- Chat tabs -->
+		<div class="chat-tabs">
+			<button class="tab-btn active" data-tab="direct">Direct</button>
+			<button class="tab-btn" data-tab="groups">Groups</button>
+		</div>
+
 		<!-- Search bar and user list -->
 		<div class="search-container">
-			<input type="text" id="chat-room-input" placeholder="Search users...">
+			<input type="text" id="chat-room-input" placeholder="Search...">
 		</div>
-		<div class="chat-rooms"></div>
+		<div class="chat-rooms" id="direct-chats"></div>
+		<div class="chat-rooms" id="group-chats" style="display: none;"></div>
 	</div>
 
 	<!-- Chat Section -->
 	<div class="chat-section">
 		<div class="chat-header">
-			<h2 id="chat-title">Select a chat</h2>
-			<span class="typing-indicator" id="typing-indicator">Typing...</span>
+			<div class="chat-header-info">
+				<h2 id="chat-title">Select a chat</h2>
+				<span class="typing-indicator" id="typing-indicator">Typing...</span>
+			</div>
+			<div class="chat-header-actions" id="chat-header-actions" style="display: none;">
+				<button id="group-info-btn" class="icon-btn">Info</button>
+			</div>
 		</div>
 		<div class="chat-content" id="chat-content"></div>
 		<div class="user-input-container">
 			<input type="text" id="user-input" placeholder="Type a message...">
 			<button id="send-btn">Send</button>
+		</div>
+	</div>
+</div>
+
+<!-- Group Chat Creation Modal -->
+<div id="create-group-modal" class="modal">
+	<div class="modal-content">
+		<span class="close">&times;</span>
+		<h2>Create New Group</h2>
+		<div class="form-group">
+			<label for="group-name">Group Name</label>
+			<input type="text" id="group-name" placeholder="Enter group name" required>
+		</div>
+		<div class="form-group">
+			<label for="group-description">Description (optional)</label>
+			<textarea id="group-description" placeholder="Enter group description"></textarea>
+		</div>
+		<div class="form-group">
+			<label>Select Members</label>
+			<div id="member-selection" class="member-selection"></div>
+		</div>
+		<button id="create-group-submit" class="btn primary-btn">Create Group</button>
+	</div>
+</div>
+
+<!-- Group Info Modal -->
+<div id="group-info-modal" class="modal">
+	<div class="modal-content">
+		<span class="close">&times;</span>
+		<h2 id="group-info-title">Group Info</h2>
+		<div class="group-details">
+			<p id="group-info-description"></p>
+			<div class="created-by">
+				<span>Created by: </span>
+				<span id="group-creator-name"></span>
+			</div>
+		</div>
+		<div class="group-members">
+			<h3>Members</h3>
+			<div id="group-members-list" class="members-list"></div>
+		</div>
+		<div id="admin-actions" class="admin-actions" style="display: none;">
+			<h3>Admin Actions</h3>
+			<div class="form-group">
+				<label for="add-member-input">Add Member</label>
+				<select id="add-member-input" class="select-member"></select>
+				<button id="add-member-btn" class="btn">Add</button>
+			</div>
+		</div>
+		<div id="creator-actions" class="creator-actions" style="display: none;">
+			<button id="delete-group-btn" class="btn danger-btn">Delete Group</button>
 		</div>
 	</div>
 </div>
