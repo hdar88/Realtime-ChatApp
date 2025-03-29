@@ -1,9 +1,12 @@
 // Set up socket for real-time communication - don't connect yet
-const socket = io('http://localhost:8080', { autoConnect: false });
+const socket = io('http://localhost:8080', {autoConnect: false});
 
 let currentChatUser = null;
 let currentUserId = null; // Store the user ID in variable
 let unreadMessages = {}; // Track unread messages by user ID
+const messageInput = document.getElementById('user-input');
+const typingIndicator = document.getElementById('typing-indicator');
+let typingTimeout;
 
 /**
  * Check if a string is a valid MongoDB ObjectId
@@ -33,26 +36,26 @@ const fetchUserData = () => {
         })
         .then(userData => {
             console.log("User data fetched:", userData);
-            
+
             // Store the user ID for later use
             currentUserId = userData._id;
             console.log("Current user ID:", currentUserId);
-            
+
             // Fetch unread messages from the server
             fetchUnreadMessages();
-            
+
             // Configure socket with user ID
-            socket.auth = { userId: currentUserId };
-            
+            socket.auth = {userId: currentUserId};
+
             // Connect socket after getting user ID
             socket.connect();
-            
+
             // Also explicitly tell server about userId after connection
             socket.on('connect', () => {
                 console.log("Socket connected with ID:", socket.id);
-                socket.emit('setUserId', { userId: currentUserId });
+                socket.emit('setUserId', {userId: currentUserId});
             });
-            
+
             // Update profile picture
             const userImage = document.querySelector('.user-image');
             if (userData.profilePic) {
@@ -92,7 +95,7 @@ const fetchUnreadMessages = () => {
         .then(data => {
             console.log('Unread messages fetched:', data);
             unreadMessages = data;
-            
+
             // Update badges for all users
             updateAllUnreadBadges();
         })
@@ -168,25 +171,25 @@ const fetchUsersList = async () => {
 const populateUsersInSidebar = (users) => {
     const chatRoomsContainer = document.querySelector('.chat-rooms');
     chatRoomsContainer.innerHTML = ''; // Clear existing users first
-    
+
     users.forEach(user => {
         const userElement = document.createElement('div');
         userElement.classList.add('chat-room', 'user-item');
         userElement.setAttribute('data-user-id', user._id);
-        
+
         // Create status indicator
         const statusIndicator = document.createElement('span');
         statusIndicator.classList.add('status-indicator', 'offline');
-        
+
         // Create user name element
         const userName = document.createElement('span');
         userName.classList.add('user-name');
         userName.textContent = user.fullName || user.username || 'Anonymous User';
-        
+
         // Append elements to user container
         userElement.appendChild(statusIndicator);
         userElement.appendChild(userName);
-        
+
         // Add unread message badge if there are unread messages
         if (unreadMessages[user._id] && unreadMessages[user._id] > 0) {
             const badge = document.createElement('span');
@@ -199,7 +202,7 @@ const populateUsersInSidebar = (users) => {
             // Add selected class to current and remove from others
             document.querySelectorAll('.chat-room').forEach(el => el.classList.remove('selected'));
             userElement.classList.add('selected');
-            
+
             openChatWithUser(user).then(r => console.log('Chat opened with:', user.fullName || user.username));
         });
 
@@ -215,19 +218,19 @@ const populateUsersInSidebar = (users) => {
 const formatMessageTime = (date) => {
     const now = new Date();
     const messageDate = new Date(date);
-    
+
     // Format time as HH:MM
     const hours = messageDate.getHours().toString().padStart(2, '0');
     const minutes = messageDate.getMinutes().toString().padStart(2, '0');
     const timeString = `${hours}:${minutes}`;
-    
+
     // If not today, add date
     if (now.toDateString() !== messageDate.toDateString()) {
-        const month = messageDate.toLocaleDateString('en-US', { month: 'short' });
+        const month = messageDate.toLocaleDateString('en-US', {month: 'short'});
         const day = messageDate.getDate();
         return `${month} ${day}, ${timeString}`;
     }
-    
+
     return timeString;
 };
 
@@ -242,28 +245,28 @@ const createMessageElement = (message, isSent, username) => {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message');
     messageElement.classList.add(isSent ? 'sent' : 'received');
-    
+
     // Add content wrapper div
     const contentWrapper = document.createElement('div');
     contentWrapper.classList.add('message-content');
-    
+
     // Add message text
     const contentText = isSent ? `You: ${message.message}` : `${username || 'User'}: ${message.message}`;
     contentWrapper.textContent = contentText;
-    
+
     messageElement.appendChild(contentWrapper);
-    
+
     // Add timestamp
     const timestamp = document.createElement('span');
     timestamp.classList.add('message-time');
     timestamp.textContent = formatMessageTime(message.createdAt || new Date());
     messageElement.appendChild(timestamp);
-    
+
     // Add read status indicator for sent messages only
     if (isSent) {
         const readStatus = document.createElement('span');
         readStatus.classList.add('read-status');
-        
+
         // Check if the message has been read
         if (message.isRead) {
             readStatus.innerHTML = '✓✓'; // Double check mark for read
@@ -274,10 +277,10 @@ const createMessageElement = (message, isSent, username) => {
             readStatus.classList.add('delivered');
             readStatus.title = 'Delivered';
         }
-        
+
         messageElement.appendChild(readStatus);
     }
-    
+
     return messageElement;
 };
 
@@ -293,12 +296,12 @@ const openChatWithUser = async (user) => {
     }
 
     currentChatUser = user;
-    
+
     // Clear unread messages for this user
     if (unreadMessages[user._id]) {
         resetUnreadMessages(user._id);
     }
-    
+
     const chatTitle = document.getElementById('chat-title');
 
     if (chatTitle) {
@@ -335,36 +338,36 @@ const openChatWithUser = async (user) => {
         if (messages.length > 0) {
             // Sort messages by creation date to show in chronological order
             messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-            
+
             const unreadMessages = [];
-            
+
             messages.forEach(message => {
                 const isSent = message.senderId === myUserId;
                 const messageElement = createMessageElement(message, isSent, user.username);
-                
+
                 // Set message ID for reference
                 if (message._id) {
                     messageElement.setAttribute('data-message-id', message._id);
                 }
-                
+
                 // Ensure no pending indicators or pending classes
                 messageElement.classList.remove('pending', 'pending-id');
-                
+
                 messagesContainerContent.appendChild(messageElement);
-                
+
                 // If this is a received message that's not read, add to unread list to mark as read
                 if (!isSent && !message.isRead) {
                     unreadMessages.push(message);
                 }
             });
-            
+
             // Cleanup any pending indicators that might be left over
             const pendingIndicators = messagesContainerContent.querySelectorAll('.pending-indicator');
             pendingIndicators.forEach(indicator => indicator.remove());
-            
+
             // Scroll to the bottom of the chat to show most recent messages
             messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
-            
+
             // Mark all unread messages as read after a short delay to ensure rendering completed
             if (unreadMessages.length > 0) {
                 setTimeout(() => {
@@ -387,7 +390,7 @@ const resetUnreadMessages = (userId) => {
     // Update local state
     unreadMessages[userId] = 0;
     updateUnreadBadge(userId);
-    
+
     // Update server
     fetch(`http://localhost:8080/api/unread/reset/${userId}`, {
         method: 'POST',
@@ -417,7 +420,7 @@ const resetUnreadMessages = (userId) => {
  */
 socket.on('newMessage', (newMessage) => {
     console.log('Received new message:', newMessage);
-    
+
     // If message is from someone else, increment unread count if not in that chat
     if (newMessage.senderId !== currentUserId) {
         // If we're not currently chatting with this user, increment unread count
@@ -441,11 +444,11 @@ socket.on('newMessage', (newMessage) => {
             }
         }
     }
-    
+
     // Check if the current chat is with the sender of the new message
-    if (currentChatUser && 
+    if (currentChatUser &&
         (currentChatUser._id === newMessage.senderId || currentChatUser._id === newMessage.receiverId)) {
-        
+
         // If this message has a tempId, it might be a confirmation of our own message
         if (newMessage.tempId) {
             // Check if we already have this message displayed with the temp ID
@@ -454,7 +457,7 @@ socket.on('newMessage', (newMessage) => {
                 // This is a confirmation of our pending message, update it
                 existingMsg.setAttribute('data-message-id', newMessage._id || newMessage.tempId);
                 existingMsg.classList.remove('pending');
-                
+
                 // Remove the pending indicator if it exists
                 const indicator = existingMsg.querySelector('.pending-indicator');
                 if (indicator) {
@@ -464,13 +467,13 @@ socket.on('newMessage', (newMessage) => {
                     const otherIndicators = existingMsg.querySelectorAll('.pending-indicator');
                     otherIndicators.forEach(ind => ind.remove());
                 }
-                
+
                 // Update timestamp with the server timestamp
                 const timestamp = existingMsg.querySelector('.message-time');
                 if (timestamp && newMessage.createdAt) {
                     timestamp.textContent = formatMessageTime(newMessage.createdAt);
                 }
-                
+
                 // Add read status for sent message
                 if (!existingMsg.querySelector('.read-status')) {
                     const readStatus = document.createElement('span');
@@ -479,17 +482,17 @@ socket.on('newMessage', (newMessage) => {
                     readStatus.title = 'Delivered';
                     existingMsg.appendChild(readStatus);
                 }
-                
+
                 return; // Don't add a duplicate message
             }
         }
-        
+
         const messagesContainerContent = document.querySelector('#chat-content');
-        
+
         // Create message element - determine if sent by current user
         const isSent = newMessage.senderId === currentUserId;
         const messageElement = createMessageElement(newMessage, isSent, currentChatUser.username);
-        
+
         // Set message ID for reference - use a consistent approach to identify real vs temporary IDs
         if (newMessage._id) {
             messageElement.setAttribute('data-message-id', newMessage._id);
@@ -503,15 +506,15 @@ socket.on('newMessage', (newMessage) => {
             messageElement.setAttribute('data-message-id', tempId);
             messageElement.classList.add('pending-id');
         }
-        
+
         // Add to chat and scroll
         messagesContainerContent.appendChild(messageElement);
         messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
-        
+
         // If this is a received message in the current chat, handle read receipt
         if (!isSent) {
             resetUnreadMessages(newMessage.senderId);
-            
+
             // Only mark as read if it has a valid MongoDB ID
             const messageId = newMessage._id;
             if (messageId && isValidMongoId(messageId)) {
@@ -529,7 +532,7 @@ socket.on('newMessage', (newMessage) => {
  */
 socket.on('messageRead', (data) => {
     console.log('Message read event received:', data);
-    
+
     // Update the read status of the message in the UI
     updateMessageReadStatus(data.messageId);
 });
@@ -544,14 +547,14 @@ const markMessageAsRead = (messageId, senderId) => {
         console.error('Missing message ID or sender ID for read receipt');
         return;
     }
-    
+
     // Always update the UI to show message as read immediately
     updateMessageReadStatus(messageId);
-    
+
     // Don't process temporary IDs on the server - only notify via socket for client-side UI update
     if (messageId.startsWith('temp-') || !isValidMongoId(messageId)) {
         console.log(`Using socket only for temporary message ID: ${messageId}`);
-        
+
         // Send read receipt via socket only (not to server)
         socket.emit('markAsRead', {
             messageId: messageId,
@@ -561,16 +564,16 @@ const markMessageAsRead = (messageId, senderId) => {
         });
         return;
     }
-    
+
     console.log(`Marking message ${messageId} from ${senderId} as read`);
-    
+
     // Send read receipt via socket
     socket.emit('markAsRead', {
         messageId: messageId,
         senderId: senderId,
         readerId: currentUserId
     });
-    
+
     // Also update via API to persist in database
     fetch(`http://localhost:8080/api/messages/read/${messageId}`, {
         method: 'POST',
@@ -584,7 +587,7 @@ const markMessageAsRead = (messageId, senderId) => {
                 // If status is 404, the message might not be saved yet - this is OK
                 if (response.status === 404) {
                     console.warn(`Message ${messageId} not found in database yet - this is normal for new messages`);
-                    return { success: false, reason: 'not_found' };
+                    return {success: false, reason: 'not_found'};
                 }
                 throw new Error(`Failed to update message read status: ${response.status}`);
             }
@@ -622,10 +625,10 @@ const updateMessageReadStatus = (messageId) => {
 const updateUnreadBadge = (userId) => {
     const userElement = document.querySelector(`.user-item[data-user-id="${userId}"]`);
     if (!userElement) return;
-    
+
     // Find existing badge or create a new one
     let badge = userElement.querySelector('.unread-badge');
-    
+
     // If no unread messages, remove badge if exists
     if (!unreadMessages[userId] || unreadMessages[userId] === 0) {
         if (badge) {
@@ -633,14 +636,14 @@ const updateUnreadBadge = (userId) => {
         }
         return;
     }
-    
+
     // If badge doesn't exist, create it
     if (!badge) {
         badge = document.createElement('span');
         badge.classList.add('unread-badge');
         userElement.appendChild(badge);
     }
-    
+
     // Update badge count
     badge.textContent = unreadMessages[userId] > 99 ? '99+' : unreadMessages[userId].toString();
 };
@@ -664,7 +667,6 @@ const sendMessage = async (user) => {
         return;
     }
 
-    const messageInput = document.querySelector('#user-input');
     const message = messageInput.value.trim();
 
     if (!message) {
@@ -685,14 +687,14 @@ const sendMessage = async (user) => {
     const messageElement = createMessageElement(tempMessageObj, true, null);
     messageElement.setAttribute('data-message-id', tempMessageObj._id);
     messageElement.classList.add('pending');
-    
+
     // Add a subtle indicator that the message is pending
     const pendingIndicator = document.createElement('span');
     pendingIndicator.classList.add('pending-indicator');
     pendingIndicator.innerHTML = '⌛'; // Hourglass emoji
     pendingIndicator.title = 'Sending...';
     messageElement.appendChild(pendingIndicator);
-    
+
     messagesContainerContent.appendChild(messageElement);
     messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
 
@@ -742,11 +744,11 @@ const sendMessage = async (user) => {
                 pendingMsg.classList.add('failed');
             }
             return;
-        } 
-        
+        }
+
         const savedMessage = await response.json();
         console.log('Message saved to database successfully:', savedMessage);
-        
+
         // Update the temporary message with the confirmed one
         const pendingMsg = document.querySelector(`[data-message-id="${tempMessageObj._id}"]`);
         if (pendingMsg) {
@@ -754,7 +756,7 @@ const sendMessage = async (user) => {
             const savedMessageId = savedMessage._id;
             pendingMsg.setAttribute('data-message-id', savedMessageId);
             pendingMsg.classList.remove('pending');
-            
+
             // Remove the pending indicator
             const indicator = pendingMsg.querySelector('.pending-indicator');
             if (indicator) {
@@ -764,7 +766,7 @@ const sendMessage = async (user) => {
                 const otherIndicators = pendingMsg.querySelectorAll('.pending-indicator');
                 otherIndicators.forEach(ind => ind.remove());
             }
-            
+
             // Update timestamp with the server timestamp
             const timestamp = pendingMsg.querySelector('.message-time');
             if (timestamp && savedMessage.createdAt) {
@@ -778,13 +780,13 @@ const sendMessage = async (user) => {
                     msg.setAttribute('data-message-id', savedMessageId);
                     msg.classList.remove('pending-id');
                     msg.classList.remove('pending');
-                    
+
                     // Remove any pending indicators
                     const pendingIndicator = msg.querySelector('.pending-indicator');
                     if (pendingIndicator) {
                         pendingIndicator.remove();
                     }
-                    
+
                     // If this was a received message and we now have the real ID, mark it as read
                     if (!msg.classList.contains('sent')) {
                         markMessageAsRead(savedMessageId, currentChatUser._id);
@@ -792,7 +794,7 @@ const sendMessage = async (user) => {
                 });
             }
         }
-        
+
     } catch (error) {
         console.error('Error sending message:', error);
         // Mark message as failed
@@ -834,7 +836,7 @@ const setupSettingsDropdown = () => {
  */
 socket.on('connect', () => {
     console.log('Connected to server with socket ID:', socket.id);
-    
+
     // Listen for online users updates
     socket.on('getOnlineUsers', (onlineUsers) => {
         console.log('Online users:', onlineUsers);
@@ -848,16 +850,16 @@ socket.on('connect', () => {
  */
 const updateOnlineStatus = (onlineUserIds) => {
     console.log('Updating online status with IDs:', onlineUserIds);
-    
+
     const userElements = document.querySelectorAll('.user-item');
-    
+
     userElements.forEach(userElement => {
         const userId = userElement.getAttribute('data-user-id');
         const statusIndicator = userElement.querySelector('.status-indicator');
-        
+
         if (statusIndicator && userId) {
             const isOnline = onlineUserIds.includes(userId);
-            
+
             if (isOnline) {
                 statusIndicator.classList.add('online');
                 statusIndicator.classList.remove('offline');
@@ -867,7 +869,7 @@ const updateOnlineStatus = (onlineUserIds) => {
                 statusIndicator.classList.remove('online');
                 statusIndicator.title = 'Offline';
             }
-            
+
             console.log(`User ${userId} status: ${isOnline ? 'online' : 'offline'}`);
         }
     });
@@ -881,15 +883,14 @@ const initializeChat = () => {
     fetchUsersList();
     setupSignOutButton();
     setupSettingsDropdown();
-    
+
     // Set up the send message button
     const sendButton = document.getElementById('send-btn');
     if (sendButton) {
         sendButton.addEventListener('click', () => sendMessage());
     }
-    
+
     // Set up the enter key to send messages
-    const messageInput = document.getElementById('user-input');
     if (messageInput) {
         messageInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -906,53 +907,77 @@ document.addEventListener('DOMContentLoaded', initializeChat);
 // Listen for message ID updates
 socket.on('messageIdUpdate', (data) => {
     console.log('Message ID update received:', data);
-    const { tempId, realId } = data;
-    
+    const {tempId, realId} = data;
+
     if (!tempId || !realId) {
         console.error('Invalid message ID update data', data);
         return;
     }
-    
+
     // Find any messages with this temp ID
     const pendingMessages = document.querySelectorAll(`[data-message-id="${tempId}"]`);
     if (pendingMessages.length > 0) {
         console.log(`Updating ${pendingMessages.length} messages with temp ID ${tempId} to real ID ${realId}`);
-        
+
         pendingMessages.forEach(msg => {
             // Update the message ID
             msg.setAttribute('data-message-id', realId);
             msg.classList.remove('pending-id');
             msg.classList.remove('pending');
-            
+
             // Remove the pending indicator (hourglass) if it exists
             const pendingIndicator = msg.querySelector('.pending-indicator');
             if (pendingIndicator) {
                 pendingIndicator.remove();
             }
-            
+
             // If this is a received message (not sent by current user), mark it as read
             if (msg.classList.contains('received') && currentChatUser) {
                 markMessageAsRead(realId, currentChatUser._id);
             }
         });
     }
-    
+
     // Also check for pending-id messages with this prefix
     const pendingIdMessages = document.querySelectorAll(`.pending-id[data-message-id^="pending-${tempId}"]`);
     pendingIdMessages.forEach(msg => {
         msg.setAttribute('data-message-id', realId);
         msg.classList.remove('pending-id');
         msg.classList.remove('pending');
-        
+
         // Remove the pending indicator (hourglass) if it exists
         const pendingIndicator = msg.querySelector('.pending-indicator');
         if (pendingIndicator) {
             pendingIndicator.remove();
         }
-        
+
         // If this was a received message and we now have the real ID, mark it as read
         if (msg.classList.contains('received') && currentChatUser) {
             markMessageAsRead(realId, currentChatUser._id);
         }
     });
+});
+
+// Event Listener for message input
+messageInput.addEventListener("input", () => {
+    if (currentChatUser == null || currentChatUser._id == null || currentUserId == null) {
+        return;
+    }
+
+    socket.emit("typing", {senderId: currentUserId, receiverId: currentChatUser._id, isTyping: true});
+    console.log("Typing event emitted");
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        socket.emit("typing", { senderId: currentUserId, receiverId: currentChatUser._id, isTyping: false });
+    }, 2000);
+});
+
+// Handle typing indicator events
+socket.on('typing', (data) => {
+    const { senderId, isTyping } = data;
+
+    if (currentChatUser && senderId === currentChatUser._id) {
+        typingIndicator.style.display = isTyping ? 'inline-block' : 'none';
+    }
 });
