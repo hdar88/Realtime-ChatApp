@@ -344,10 +344,28 @@ body {
 /* Message time stamps */
 .message-time {
     font-size: 0.7rem;
-    opacity: 0.7;
-    margin-top: 4px;
-    display: block;
-    text-align: right;
+    color: var(--medium-gray);
+    align-self: flex-end;
+    margin-top: 5px;
+    margin-right: 5px;
+}
+
+/* Read status indicators */
+.read-status {
+    font-size: 0.8rem;
+    margin-left: 6px;
+    margin-right: 5px;
+    align-self: flex-end;
+    position: relative;
+    bottom: 1px;
+}
+
+.read-status.delivered {
+    color: var(--medium-gray);
+}
+
+.read-status.read {
+    color: var(--info-color);
 }
 
 /* Pending message styles */

@@ -7,6 +7,8 @@ import mongoose from "mongoose";
  * @property {Schema.Types.ObjectId} senderId - ID of the sender
  * @property {Schema.Types.ObjectId} receiverId - ID of the receiver
  * @property {String} message - Message content
+ * @property {Boolean} isRead - Whether the message has been read
+ * @property {Date} readAt - Date at which the message was read
  * @property {Date} createdAt - Date at which the message was created
  * @property {Date} updatedAt - Date at which the message was last updated
  */
@@ -25,6 +27,14 @@ const messageSchema = new mongoose.Schema(
         message: {
             type: String,
             required: true,
+        },
+        isRead: {
+            type: Boolean,
+            default: false,
+        },
+        readAt: {
+            type: Date,
+            default: null,
         },
     },
     {timestamps: true}

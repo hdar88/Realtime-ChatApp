@@ -34,13 +34,6 @@ const emitOnlineUsers = () => {
 
 io.on("connection", (socket) => {
     console.log("a user connected", socket.id);
-    
-    // Debug all socket data
-    console.log("Socket handshake:", socket.handshake);
-    console.log("Socket auth:", socket.auth);
-    console.log("Socket handshake auth:", socket.handshake.auth);
-    console.log("Socket query:", socket.handshake.query);
-    
     // Try multiple sources for user ID
     let userId = null;
     
@@ -80,18 +73,55 @@ io.on("connection", (socket) => {
     // Handle new message events from clients
     socket.on("newMessage", async (messageData) => {
         console.log("New message received:", messageData);
-        const { receiverId, senderId } = messageData;
+        const { receiverId, senderId, tempId } = messageData;
         
         // Update the unread message count in the database
         await incrementUnreadCount(receiverId, senderId);
+        
+        // Create a copy of the message data that we'll send to the receiver
+        const messageToSend = { ...messageData };
+        
+        // If the message doesn't have a real _id but has a tempId, use tempId as temporary _id
+        // This ensures receiver always has some ID to work with
+        if (!messageToSend._id && tempId) {
+            messageToSend._id = tempId; // Use tempId as fallback _id
+            console.log("Using temporary ID for message:", tempId);
+        } else if (messageToSend._id) {
+            console.log("Message already has a real ID:", messageToSend._id);
+        }
         
         const receiverSocketId = getReceiverSocketId(receiverId);
         
         if (receiverSocketId) {
             console.log("Emitting to receiver:", receiverId, "socket:", receiverSocketId);
-            io.to(receiverSocketId).emit("newMessage", messageData);
+            io.to(receiverSocketId).emit("newMessage", messageToSend);
         } else {
             console.log("Receiver not online. Message will only be stored in database:", receiverId);
+        }
+    });
+
+    // Handle message read events
+    socket.on("markAsRead", async (data) => {
+        console.log("Mark as read event received:", data);
+        const { messageId, senderId, readerId, isTemporary } = data;
+        
+        if (!messageId || !senderId || !readerId) {
+            console.error("Invalid markAsRead data:", data);
+            return;
+        }
+        
+        // Get the sender's socket
+        const senderSocketId = getReceiverSocketId(senderId);
+        
+        if (senderSocketId) {
+            console.log(`Notifying sender ${senderId} that message ${messageId} was read by ${readerId}`);
+            
+            // Always forward the read receipt to update UI
+            io.to(senderSocketId).emit("messageRead", {
+                messageId,
+                readerId,
+                readAt: new Date()
+            });
         }
     });
 

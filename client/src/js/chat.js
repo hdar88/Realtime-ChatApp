@@ -6,6 +6,15 @@ let currentUserId = null; // Store the user ID in variable
 let unreadMessages = {}; // Track unread messages by user ID
 
 /**
+ * Check if a string is a valid MongoDB ObjectId
+ * @param {string} id - The ID to check
+ * @returns {boolean} - True if it's a valid MongoDB ObjectId
+ */
+const isValidMongoId = (id) => {
+    return id && typeof id === 'string' && id.length === 24 && /^[0-9a-f]{24}$/i.test(id);
+};
+
+/**
  * Fetch user data and update profile information
  */
 const fetchUserData = () => {
@@ -250,6 +259,25 @@ const createMessageElement = (message, isSent, username) => {
     timestamp.textContent = formatMessageTime(message.createdAt || new Date());
     messageElement.appendChild(timestamp);
     
+    // Add read status indicator for sent messages only
+    if (isSent) {
+        const readStatus = document.createElement('span');
+        readStatus.classList.add('read-status');
+        
+        // Check if the message has been read
+        if (message.isRead) {
+            readStatus.innerHTML = '✓✓'; // Double check mark for read
+            readStatus.classList.add('read');
+            readStatus.title = 'Read';
+        } else {
+            readStatus.innerHTML = '✓'; // Single check for delivered
+            readStatus.classList.add('delivered');
+            readStatus.title = 'Delivered';
+        }
+        
+        messageElement.appendChild(readStatus);
+    }
+    
     return messageElement;
 };
 
@@ -308,14 +336,43 @@ const openChatWithUser = async (user) => {
             // Sort messages by creation date to show in chronological order
             messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
             
+            const unreadMessages = [];
+            
             messages.forEach(message => {
                 const isSent = message.senderId === myUserId;
                 const messageElement = createMessageElement(message, isSent, user.username);
+                
+                // Set message ID for reference
+                if (message._id) {
+                    messageElement.setAttribute('data-message-id', message._id);
+                }
+                
+                // Ensure no pending indicators or pending classes
+                messageElement.classList.remove('pending', 'pending-id');
+                
                 messagesContainerContent.appendChild(messageElement);
+                
+                // If this is a received message that's not read, add to unread list to mark as read
+                if (!isSent && !message.isRead) {
+                    unreadMessages.push(message);
+                }
             });
+            
+            // Cleanup any pending indicators that might be left over
+            const pendingIndicators = messagesContainerContent.querySelectorAll('.pending-indicator');
+            pendingIndicators.forEach(indicator => indicator.remove());
             
             // Scroll to the bottom of the chat to show most recent messages
             messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
+            
+            // Mark all unread messages as read after a short delay to ensure rendering completed
+            if (unreadMessages.length > 0) {
+                setTimeout(() => {
+                    unreadMessages.forEach(message => {
+                        markMessageAsRead(message._id, message.senderId);
+                    });
+                }, 500);
+            }
         }
     } catch (error) {
         console.error('Error fetching messages:', error);
@@ -373,6 +430,15 @@ socket.on('newMessage', (newMessage) => {
             unreadMessages[newMessage.senderId]++;
             // Update the badge
             updateUnreadBadge(newMessage.senderId);
+        } else {
+            // We are currently chatting with this user, mark as read if it has a valid MongoDB ID
+            const messageId = newMessage._id;
+            if (messageId && isValidMongoId(messageId)) {
+                console.log('Marking received message as read, ID:', messageId);
+                markMessageAsRead(messageId, newMessage.senderId);
+            } else {
+                console.log('Received message ID not valid for marking as read:', messageId);
+            }
         }
     }
     
@@ -393,12 +459,25 @@ socket.on('newMessage', (newMessage) => {
                 const indicator = existingMsg.querySelector('.pending-indicator');
                 if (indicator) {
                     indicator.remove();
+                } else {
+                    // Check if there are any other pending indicators that might need removal
+                    const otherIndicators = existingMsg.querySelectorAll('.pending-indicator');
+                    otherIndicators.forEach(ind => ind.remove());
                 }
                 
                 // Update timestamp with the server timestamp
                 const timestamp = existingMsg.querySelector('.message-time');
                 if (timestamp && newMessage.createdAt) {
                     timestamp.textContent = formatMessageTime(newMessage.createdAt);
+                }
+                
+                // Add read status for sent message
+                if (!existingMsg.querySelector('.read-status')) {
+                    const readStatus = document.createElement('span');
+                    readStatus.classList.add('read-status', 'delivered');
+                    readStatus.innerHTML = '✓';
+                    readStatus.title = 'Delivered';
+                    existingMsg.appendChild(readStatus);
                 }
                 
                 return; // Don't add a duplicate message
@@ -411,21 +490,130 @@ socket.on('newMessage', (newMessage) => {
         const isSent = newMessage.senderId === currentUserId;
         const messageElement = createMessageElement(newMessage, isSent, currentChatUser.username);
         
-        // Set message ID for reference
+        // Set message ID for reference - use a consistent approach to identify real vs temporary IDs
         if (newMessage._id) {
             messageElement.setAttribute('data-message-id', newMessage._id);
+            // Only add the pending-id class if it's clearly NOT a valid MongoDB ID
+            if (!isValidMongoId(newMessage._id)) {
+                messageElement.classList.add('pending-id');
+            }
+        } else {
+            // No ID at all, generate a temporary one
+            const tempId = 'temp-' + Date.now();
+            messageElement.setAttribute('data-message-id', tempId);
+            messageElement.classList.add('pending-id');
         }
         
         // Add to chat and scroll
         messagesContainerContent.appendChild(messageElement);
         messagesContainerContent.scrollTop = messagesContainerContent.scrollHeight;
         
-        // If this is a received message in the current chat, reset unread count
+        // If this is a received message in the current chat, handle read receipt
         if (!isSent) {
             resetUnreadMessages(newMessage.senderId);
+            
+            // Only mark as read if it has a valid MongoDB ID
+            const messageId = newMessage._id;
+            if (messageId && isValidMongoId(messageId)) {
+                console.log('Marking received message as read, ID:', messageId);
+                markMessageAsRead(messageId, newMessage.senderId);
+            } else {
+                console.log('Received message has an invalid or temporary ID, not marking as read yet:', messageId);
+            }
         }
     }
 });
+
+/**
+ * Listen for message read status updates
+ */
+socket.on('messageRead', (data) => {
+    console.log('Message read event received:', data);
+    
+    // Update the read status of the message in the UI
+    updateMessageReadStatus(data.messageId);
+});
+
+/**
+ * Mark a message as read
+ * @param {string} messageId - ID of the message to mark as read
+ * @param {string} senderId - ID of the sender of the message
+ */
+const markMessageAsRead = (messageId, senderId) => {
+    if (!messageId || !senderId) {
+        console.error('Missing message ID or sender ID for read receipt');
+        return;
+    }
+    
+    // Always update the UI to show message as read immediately
+    updateMessageReadStatus(messageId);
+    
+    // Don't process temporary IDs on the server - only notify via socket for client-side UI update
+    if (messageId.startsWith('temp-') || !isValidMongoId(messageId)) {
+        console.log(`Using socket only for temporary message ID: ${messageId}`);
+        
+        // Send read receipt via socket only (not to server)
+        socket.emit('markAsRead', {
+            messageId: messageId,
+            senderId: senderId,
+            readerId: currentUserId,
+            isTemporary: true
+        });
+        return;
+    }
+    
+    console.log(`Marking message ${messageId} from ${senderId} as read`);
+    
+    // Send read receipt via socket
+    socket.emit('markAsRead', {
+        messageId: messageId,
+        senderId: senderId,
+        readerId: currentUserId
+    });
+    
+    // Also update via API to persist in database
+    fetch(`http://localhost:8080/api/messages/read/${messageId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                // If status is 404, the message might not be saved yet - this is OK
+                if (response.status === 404) {
+                    console.warn(`Message ${messageId} not found in database yet - this is normal for new messages`);
+                    return { success: false, reason: 'not_found' };
+                }
+                throw new Error(`Failed to update message read status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Read status updated in database:', data);
+        })
+        .catch(error => {
+            console.error('Error updating read status:', error);
+        });
+};
+
+/**
+ * Update the read status of a message in the UI
+ * @param {string} messageId - ID of the message to update
+ */
+const updateMessageReadStatus = (messageId) => {
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageElement) {
+        const readStatus = messageElement.querySelector('.read-status');
+        if (readStatus) {
+            readStatus.innerHTML = '✓✓'; // Double check mark
+            readStatus.classList.remove('delivered');
+            readStatus.classList.add('read');
+            readStatus.title = 'Read';
+        }
+    }
+};
 
 /**
  * Update the unread message badge for a user
@@ -514,7 +702,8 @@ const sendMessage = async (user) => {
     // Prepare data for API call
     const messageData = {
         message,
-        receiverId: user._id
+        receiverId: user._id,
+        tempId: tempMessageObj._id // Include temp ID for database tracking
     };
 
     // Create message object for socket
@@ -561,19 +750,46 @@ const sendMessage = async (user) => {
         // Update the temporary message with the confirmed one
         const pendingMsg = document.querySelector(`[data-message-id="${tempMessageObj._id}"]`);
         if (pendingMsg) {
-            pendingMsg.setAttribute('data-message-id', savedMessage._id);
+            // Store the new ID for reference
+            const savedMessageId = savedMessage._id;
+            pendingMsg.setAttribute('data-message-id', savedMessageId);
             pendingMsg.classList.remove('pending');
             
             // Remove the pending indicator
             const indicator = pendingMsg.querySelector('.pending-indicator');
             if (indicator) {
                 indicator.remove();
+            } else {
+                // Check if there are any other pending indicators that might need removal
+                const otherIndicators = pendingMsg.querySelectorAll('.pending-indicator');
+                otherIndicators.forEach(ind => ind.remove());
             }
             
             // Update timestamp with the server timestamp
             const timestamp = pendingMsg.querySelector('.message-time');
             if (timestamp && savedMessage.createdAt) {
                 timestamp.textContent = formatMessageTime(savedMessage.createdAt);
+            }
+
+            // Also check if there are any pending-id messages from this person that need updating
+            if (currentChatUser) {
+                const pendingIdMessages = document.querySelectorAll(`.pending-id[data-message-id^="pending-${tempMessageObj._id}"]`);
+                pendingIdMessages.forEach(msg => {
+                    msg.setAttribute('data-message-id', savedMessageId);
+                    msg.classList.remove('pending-id');
+                    msg.classList.remove('pending');
+                    
+                    // Remove any pending indicators
+                    const pendingIndicator = msg.querySelector('.pending-indicator');
+                    if (pendingIndicator) {
+                        pendingIndicator.remove();
+                    }
+                    
+                    // If this was a received message and we now have the real ID, mark it as read
+                    if (!msg.classList.contains('sent')) {
+                        markMessageAsRead(savedMessageId, currentChatUser._id);
+                    }
+                });
             }
         }
         
@@ -686,3 +902,57 @@ const initializeChat = () => {
 
 // Initialize the chat when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', initializeChat);
+
+// Listen for message ID updates
+socket.on('messageIdUpdate', (data) => {
+    console.log('Message ID update received:', data);
+    const { tempId, realId } = data;
+    
+    if (!tempId || !realId) {
+        console.error('Invalid message ID update data', data);
+        return;
+    }
+    
+    // Find any messages with this temp ID
+    const pendingMessages = document.querySelectorAll(`[data-message-id="${tempId}"]`);
+    if (pendingMessages.length > 0) {
+        console.log(`Updating ${pendingMessages.length} messages with temp ID ${tempId} to real ID ${realId}`);
+        
+        pendingMessages.forEach(msg => {
+            // Update the message ID
+            msg.setAttribute('data-message-id', realId);
+            msg.classList.remove('pending-id');
+            msg.classList.remove('pending');
+            
+            // Remove the pending indicator (hourglass) if it exists
+            const pendingIndicator = msg.querySelector('.pending-indicator');
+            if (pendingIndicator) {
+                pendingIndicator.remove();
+            }
+            
+            // If this is a received message (not sent by current user), mark it as read
+            if (msg.classList.contains('received') && currentChatUser) {
+                markMessageAsRead(realId, currentChatUser._id);
+            }
+        });
+    }
+    
+    // Also check for pending-id messages with this prefix
+    const pendingIdMessages = document.querySelectorAll(`.pending-id[data-message-id^="pending-${tempId}"]`);
+    pendingIdMessages.forEach(msg => {
+        msg.setAttribute('data-message-id', realId);
+        msg.classList.remove('pending-id');
+        msg.classList.remove('pending');
+        
+        // Remove the pending indicator (hourglass) if it exists
+        const pendingIndicator = msg.querySelector('.pending-indicator');
+        if (pendingIndicator) {
+            pendingIndicator.remove();
+        }
+        
+        // If this was a received message and we now have the real ID, mark it as read
+        if (msg.classList.contains('received') && currentChatUser) {
+            markMessageAsRead(realId, currentChatUser._id);
+        }
+    });
+});
