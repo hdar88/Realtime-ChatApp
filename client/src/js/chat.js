@@ -1482,9 +1482,7 @@ const createNewGroup = async () => {
         
         const newGroup = await response.json();
         
-        // Add the new group to our list and refresh display
-        userGroups.push(newGroup);
-        displayUserGroups(userGroups);
+
         
         // Close the modal
         document.getElementById('create-group-modal').style.display = 'none';
