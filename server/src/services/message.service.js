@@ -1,12 +1,11 @@
 import Chat from "../models/chatModel.js";
 import Message from "../models/messageModel.js";
-import {getReceiverSocketId, io} from "../socket/socket.js";
 
 /**
- * Controller to send message to a user.
+ * Controller to send a message to another user.
  * @param req request
  * @param res response
- * @returns {Promise<void>} void
+ * @returns {Promise<*>} response
  */
 export const sendMessage = async (req, res) => {
     try {
@@ -34,16 +33,10 @@ export const sendMessage = async (req, res) => {
             chat.messages.push(newMessage._id);
         }
 
-        await chat.save();
-        await newMessage.save();
-
+        // Save both chat and message
         await Promise.all([chat.save(), newMessage.save()]);
-
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("newMessage", newMessage);
-        }
-
+        
+        // Increment unread message count for receive
         res.status(201).json(newMessage);
     } catch (error) {
         console.log("Error while trying to send a message: ", error.message);

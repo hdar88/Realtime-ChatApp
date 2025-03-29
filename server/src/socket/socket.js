@@ -1,6 +1,7 @@
 import {Server} from "socket.io";
 import http from "http";
 import express from "express";
+import { incrementUnreadCount } from "../services/unread.service.js";
 
 const app = express();
 
@@ -24,18 +25,91 @@ export const getReceiverSocketId = (receiverId) => {
 
 const userSocketMap = {};
 
+// Helper function to emit online users to all clients
+const emitOnlineUsers = () => {
+    const onlineUsers = Object.keys(userSocketMap);
+    console.log('Emitting online users:', onlineUsers);
+    io.emit("getOnlineUsers", onlineUsers);
+};
+
 io.on("connection", (socket) => {
     console.log("a user connected", socket.id);
-
-    const userId = socket.handshake.query.userId;
-    if (userId != "undefined") userSocketMap[userId] = socket.id;
-
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    
+    // Debug all socket data
+    console.log("Socket handshake:", socket.handshake);
+    console.log("Socket auth:", socket.auth);
+    console.log("Socket handshake auth:", socket.handshake.auth);
+    console.log("Socket query:", socket.handshake.query);
+    
+    // Try multiple sources for user ID
+    let userId = null;
+    
+    if (socket.handshake.auth && socket.handshake.auth.userId) {
+        userId = socket.handshake.auth.userId;
+        console.log("Found userId in handshake.auth:", userId);
+    } else if (socket.handshake.query && socket.handshake.query.userId) {
+        userId = socket.handshake.query.userId;
+        console.log("Found userId in handshake.query:", userId);
+    } else if (socket.auth && socket.auth.userId) {
+        userId = socket.auth.userId;
+        console.log("Found userId in socket.auth:", userId);
+    }
+    
+    // If we have a valid userId, map it to the socket
+    if (userId && userId !== 'undefined') {
+        userSocketMap[userId] = socket.id;
+        console.log(`User ${userId} mapped to socket ${socket.id}`);
+        
+        // Emit updated online users list to all clients
+        emitOnlineUsers();
+    } else {
+        console.log("Warning: Socket connected without userId");
+    }
+    
+    // Set a mechanism for the client to set userId later if needed
+    socket.on("setUserId", (data) => {
+        if (data && data.userId) {
+            console.log(`Setting userId for socket ${socket.id} to ${data.userId}`);
+            userSocketMap[data.userId] = socket.id;
+            
+            // Emit updated online users list to all clients
+            emitOnlineUsers();
+        }
+    });
+    
+    // Handle new message events from clients
+    socket.on("newMessage", async (messageData) => {
+        console.log("New message received:", messageData);
+        const { receiverId, senderId } = messageData;
+        
+        // Update the unread message count in the database
+        await incrementUnreadCount(receiverId, senderId);
+        
+        const receiverSocketId = getReceiverSocketId(receiverId);
+        
+        if (receiverSocketId) {
+            console.log("Emitting to receiver:", receiverId, "socket:", receiverSocketId);
+            io.to(receiverSocketId).emit("newMessage", messageData);
+        } else {
+            console.log("Receiver not online. Message will only be stored in database:", receiverId);
+        }
+    });
 
     socket.on("disconnect", () => {
         console.log("user disconnected", socket.id);
-        delete userSocketMap[userId];
-        io.emit("getOnlineUsers", Object.keys(userSocketMap));
+        
+        // Find and remove the disconnected user from the map
+        const userIdToRemove = Object.keys(userSocketMap).find(
+            key => userSocketMap[key] === socket.id
+        );
+        
+        if (userIdToRemove) {
+            console.log(`User ${userIdToRemove} disconnected`);
+            delete userSocketMap[userIdToRemove];
+            
+            // Emit updated online users list to all clients
+            emitOnlineUsers();
+        }
     });
 });
 
