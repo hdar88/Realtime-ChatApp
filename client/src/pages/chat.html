@@ -69,6 +69,9 @@
 	<div class="modal-content">
 		<span class="close">&times;</span>
 		<h2>Create New Group</h2>
+		<div class="group-pic-preview profile-preview">
+			<img id="group-pic-preview" src="../assets/group_icon.webp" alt="Group Picture" class="profile-pic-large">
+		</div>
 		<div class="form-group">
 			<label for="group-name">Group Name</label>
 			<input type="text" id="group-name" placeholder="Enter group name" required>
@@ -76,6 +79,12 @@
 		<div class="form-group">
 			<label for="group-description">Description (optional)</label>
 			<textarea id="group-description" placeholder="Enter group description"></textarea>
+		</div>
+		<div class="form-group">
+			<label>Group Picture</label>
+			<div class="profile-pic-controls">
+				<button type="button" id="generate-group-avatar-btn" class="btn">Generate Group Avatar</button>
+			</div>
 		</div>
 		<div class="form-group">
 			<label>Select Members</label>
@@ -112,6 +121,44 @@
 		<div id="creator-actions" class="creator-actions" style="display: none;">
 			<button id="delete-group-btn" class="btn danger-btn">Delete Group</button>
 		</div>
+	</div>
+</div>
+
+<!-- Profile Settings Modal -->
+<div id="profile-settings-modal" class="modal">
+	<div class="modal-content">
+		<span class="close">&times;</span>
+		<h2>Profile Settings</h2>
+		<div class="profile-preview">
+			<img id="profile-pic-preview" src="../assets/user_profile_picture.webp" alt="Profile Picture" class="profile-pic-large">
+		</div>
+		<form id="profile-form">
+			<div class="form-group">
+				<label for="profile-fullname">Full Name</label>
+				<input type="text" id="profile-fullname" placeholder="Enter your full name">
+			</div>
+			<div class="form-group">
+				<label for="profile-username">Username</label>
+				<input type="text" id="profile-username" placeholder="Enter your username">
+			</div>
+			<div class="form-group">
+				<label for="profile-gender">Gender</label>
+				<select id="profile-gender">
+					<option value="male">Male</option>
+					<option value="female">Female</option>
+					<option value="divers">Diverse</option>
+				</select>
+			</div>
+			<div class="form-group">
+				<label>Profile Picture</label>
+				<div class="profile-pic-controls">
+					<button type="button" id="generate-avatar-btn" class="btn">Generate New Avatar</button>
+				</div>
+			</div>
+			<div class="form-actions">
+				<button type="button" id="save-profile-btn" class="btn primary-btn">Save Changes</button>
+			</div>
+		</form>
 	</div>
 </div>
 

@@ -10,7 +10,7 @@ import { getReceiverSocketId, io } from "../socket/socket.js";
  */
 export const createGroupChat = async (req, res) => {
     try {
-        const { name, description, members } = req.body;
+        const { name, description, members, groupPic } = req.body;
         const userId = req.user._id;
 
         if (!name) {
@@ -30,7 +30,8 @@ export const createGroupChat = async (req, res) => {
             description,
             members: allMembers,
             admins: [userId], // Creator is always an admin
-            creator: userId
+            creator: userId,
+            groupPic: groupPic || "" // Save group picture if provided
         });
 
         await newGroupChat.save();
