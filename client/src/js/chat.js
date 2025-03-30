@@ -998,7 +998,7 @@ const updateOnlineStatus = (onlineUserIds) => {
 /**
  * Initialize the chat application
  */
-const initializeChat = () => {
+function initializeChat() {
     // Fetch user data (this sets up socket connection and socket listeners)
     fetchUserData();
     
@@ -1062,10 +1062,47 @@ const initializeChat = () => {
     }
     
     console.log("Chat application initialized");
-};
+    
+    // Ensure CSS variables are properly applied
+    ensureProperThemeStyling();
+}
+
+/**
+ * Ensure proper theme styling for text visibility
+ */
+function ensureProperThemeStyling() {
+    // Force reapplication of text colors
+    const userElements = document.querySelectorAll('.user-name, #user-name, .group-tag, #chat-title, .tab-btn');
+    userElements.forEach(element => {
+        if (element) {
+            // Ensure the element's color is set explicitly
+            element.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color');
+            
+            // For elements with class group-tag, always ensure white text
+            if (element.classList.contains('group-tag')) {
+                element.style.color = 'white';
+            }
+            
+            // For active tab buttons, use primary color
+            if (element.classList.contains('tab-btn') && element.classList.contains('active')) {
+                element.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
+            }
+        }
+    });
+}
 
 // Initialize the chat when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', initializeChat);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeChat();
+    setThemeBasedIcons();
+    ensureProperThemeStyling();
+    
+    // Also add listener for theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        setThemeBasedIcons();
+        ensureProperThemeStyling();
+    });
+});
 
 // Listen for message ID updates
 socket.on('messageIdUpdate', (data) => {
@@ -1294,8 +1331,12 @@ const setupTabSwitching = () => {
     tabButtons.forEach(tab => {
         tab.addEventListener('click', () => {
             // Handle tab selection UI
-            tabButtons.forEach(t => t.classList.remove('active'));
+            tabButtons.forEach(t => {
+                t.classList.remove('active');
+                t.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color');
+            });
             tab.classList.add('active');
+            tab.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
 
             const tabType = tab.getAttribute('data-tab');
             
@@ -3050,3 +3091,25 @@ const generateGroupAvatar = (imageElement) => {
     
     return avatarUrl;
 };
+
+// Set appropriate icons based on color scheme
+function setThemeBasedIcons() {
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const settingsIcon = document.querySelector('.settings-icon');
+    
+    if (settingsIcon) {
+        settingsIcon.src = isDarkMode ? '../assets/settings_icon_light.svg' : '../assets/settings_icon_dark.svg';
+    }
+}
+
+// Call on page load
+setThemeBasedIcons();
+
+// Also listen for changes in color scheme
+if (window.matchMedia) {
+    const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    colorSchemeQuery.addEventListener('change', setThemeBasedIcons);
+}
+
+// Call this in case the DOM is not fully loaded when this script runs
+document.addEventListener('DOMContentLoaded', setThemeBasedIcons);

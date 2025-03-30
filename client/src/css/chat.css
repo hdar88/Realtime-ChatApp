@@ -100,6 +100,7 @@ body {
     font-size: 1.1rem;
     font-weight: 500;
     margin-right: auto;
+    color: var(--text-color);
 }
 
 .settings-container {
@@ -243,6 +244,7 @@ body {
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
+    color: var(--text-color);
 }
 
 .chat-section {
@@ -510,7 +512,7 @@ body {
     display: flex;
     width: 100%;
     margin: 10px 0;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--light-gray);
 }
 
 .tab-btn {
@@ -518,19 +520,19 @@ body {
     padding: 10px 0;
     background: none;
     border: none;
-    color: #ccc;
+    color: var(--text-color);
     cursor: pointer;
     font-size: 14px;
     transition: all 0.3s ease;
 }
 
 .tab-btn.active {
-    color: #fff;
-    border-bottom: 2px solid #007bff;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
 }
 
 .tab-btn:hover {
-    background-color: #333;
+    background-color: var(--light-gray);
 }
 
 /* Group chat styles */
@@ -587,14 +589,17 @@ body {
     border-radius: 10px;
     margin-left: 5px;
     background-color: #007bff;
+    color: white;
 }
 
 .admin-tag {
     background-color: #ff9800;
+    color: white;
 }
 
 .creator-tag {
     background-color: #4CAF50;
+    color: white;
 }
 
 /* Modal Styles */
