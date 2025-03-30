@@ -2582,11 +2582,10 @@ const updateGroupMessageReadStatus = (messageId) => {
             readStatus.classList.add('read');
             readStatus.textContent = 'Read by all';
         } else if (readByIds.length > 1) {
-            // If at least one other person has read it
-            const readCount = readByIds.filter(id => id !== currentUserId).length;
+            // If at least one other person has read it, but not all
             readStatus.classList.remove('delivered');
             readStatus.classList.add('read');
-            readStatus.textContent = `Read by ${readCount}`;
+            readStatus.textContent = 'Read'; // Simply show "Read" instead of count
         } else {
             // No one has read it yet
             readStatus.classList.remove('read');
@@ -2702,8 +2701,33 @@ const processGroupMessage = (message, isFromCurrentUser = false) => {
         readStatus.textContent = 'Delivered';
         messageElement.appendChild(readStatus);
         
-        // If this is an existing message with read status info, update the status
-        // No need to call updateGroupMessageReadStatus here as we'll do it from displayGroupMessages
+        // Check if any users have already read the message
+        if (message.readBy && message.readBy.length > 0) {
+            // Get member IDs excluding the current user
+            const memberIds = currentGroupChat.members.map(member => 
+                typeof member === 'object' ? member._id : member
+            ).filter(id => id !== currentUserId);
+            
+            // Convert readBy to string IDs
+            const readByIds = message.readBy.map(reader => 
+                typeof reader === 'object' ? reader._id : reader
+            ).filter(id => id !== currentUserId); // Exclude current user
+            
+            if (readByIds.length > 0) {
+                // Check if all members have read it
+                const allRead = memberIds.every(id => readByIds.includes(id));
+                
+                if (allRead) {
+                    readStatus.classList.remove('delivered');
+                    readStatus.classList.add('read');
+                    readStatus.textContent = 'Read by all';
+                } else {
+                    readStatus.classList.remove('delivered');
+                    readStatus.classList.add('read');
+                    readStatus.textContent = 'Read';
+                }
+            }
+        }
     }
     
     chatContent.appendChild(messageElement);
